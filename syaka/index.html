@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカ1</title>
+    <title>シャカシャカするやつ</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25)); }
@@ -25,9 +25,9 @@
         const smallSize = 100;   
         const gachaCount = 10;   
         
-        const FRICTION = 0.92;      
-        const ROT_FRICTION = 0.85; 
-        const BOUNCE = 0.1;        
+        const FRICTION = 0.95;      
+        const ROT_FRICTION = 0.90; // ブレーキを少し強化
+        const BOUNCE = 0.2;        // 跳ね返りを抑えて落ち着かせる
         const GRAVITY = 0.6;        
         const MAX_SPEED = 20;
 
@@ -123,15 +123,14 @@
             window.addEventListener("devicemotion", (e) => {
                 let ag = e.accelerationIncludingGravity;
                 if(!ag || ag.x === null) return;
-                
-                // スマホを振った時だけ回転エネルギーを注入
-                const totalMotion = Math.abs(ag.x) + Math.abs(ag.y);
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
                         b.vx -= ag.x * 0.6 * flip; 
                         b.vy += ag.y * 0.6 * flip;
-                        if (totalMotion > 15) { // 強く振った時だけ回転
-                            b.va += (ag.x * 0.1);
+                        
+                        const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+                        if (speed > 5) {
+                            b.va += (b.vx * 0.05);
                         }
                     }
                 });
@@ -148,29 +147,46 @@
                         let dist = Math.sqrt(dx * dx + dy * dy) || 1;
                         let minDist = (a.w + b.w) * 0.48;
 
-                        if (dist < minDist - 5) { // 遊びを5pxに拡大。これでビチビチしない。
+                        if (dist < minDist - 3) { // 遊び（隙間）を3pxに拡大して安定化
                             let overlap = (minDist - dist);
                             let nx = dx / dist;
                             let ny = dy / dist;
                             
-                            if (!a.isDragging) { a.vx -= nx * 0.1; a.vy -= ny * 0.1; a.px -= nx * overlap * 0.1; }
-                            if (!b.isDragging) { b.vx += nx * 0.1; b.vy += ny * 0.1; b.px += nx * overlap * 0.1; }
+                            let relativeVx = b.vx - a.vx;
+                            let relativeVy = b.vy - a.vy;
+                            let velAlongNormal = relativeVx * nx + relativeVy * ny;
+
+                            if (velAlongNormal < -0.1) {
+                                let impulse = -1.1 * velAlongNormal;
+                                impulse /= 2;
+                                if (!a.isDragging) { a.vx -= nx * impulse; a.vy -= ny * impulse; }
+                                if (!b.isDragging) { b.vx += nx * impulse; b.vy += ny * impulse; }
+                            }
+
+                            let moveX = nx * overlap * 0.2;
+                            let moveY = ny * overlap * 0.2;
+                            if (!a.isDragging) { a.px -= moveX; a.py -= moveY; }
+                            if (!b.isDragging) { b.px += moveX; b.py += moveY; }
                         }
                     }
                 }
 
                 boxes.forEach(b => {
                     if (!b.isDragging) {
+                        // 1. まず摩擦と重力を計算
                         b.vy += GRAVITY;
                         b.vx *= FRICTION;
                         b.vy *= FRICTION;
                         b.va *= ROT_FRICTION;
 
-                        // 【最重要：静止判定の強化】
-                        // 速度が一定以下のときは完全にゼロにする
-                        if (Math.abs(b.vx) < 0.2) b.vx = 0;
-                        if (Math.abs(b.vy) < 0.2) b.vy = 0;
-                        if (Math.abs(b.va) < 0.05) b.va = 0;
+                        // 2. 【超重要】「不気味な動き」を止める絶対的な閾値
+                        // 速度が極小（0.1以下）なら、物理計算を打ち切って完全停止させる
+                        if (Math.abs(b.vx) < 0.1) b.vx = 0;
+                        if (Math.abs(b.vy) < 0.1 && Math.abs(b.vy + GRAVITY) < 1) b.vy = 0;
+                        if (Math.abs(b.va) < 0.01) b.va = 0; 
+
+                        b.vx = Math.min(Math.max(b.vx, -MAX_SPEED), MAX_SPEED);
+                        b.vy = Math.min(Math.max(b.vy, -MAX_SPEED), MAX_SPEED);
 
                         b.px += b.vx;
                         b.py += b.vy;
@@ -179,13 +195,13 @@
                         const rw = window.innerWidth - b.w;
                         const bh = window.innerHeight - b.h;
 
-                        if (b.px < 0) { b.px = 0; b.vx = 0; }
-                        if (b.px > rw) { b.px = rw; b.vx = 0; }
+                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
+                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; }
                         if (b.py > bh) { 
-                            b.py = bh; 
-                            b.vy = 0;
-                            b.va *= 0.8; // 床に接したら回転を急速に殺す
+                            b.py = bh; b.vy *= -BOUNCE; 
+                            if (Math.abs(b.vy) < 0.5) b.vy = 0;
                         }
+                        if (b.py < -1000) b.py = -1000;
                     }
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
                 });
