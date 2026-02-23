@@ -168,11 +168,12 @@
                         b.vy *= FRICTION;
                         b.va *= ROT_FRICTION;
 
-                        // ★速度が速い（激しく動いている）時だけ回転を加える修正
                         let speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
                         if (speed > 5) { 
-                            b.va += b.vx * 0.08; 
+                            b.va += b.vx * 0.03; 
                         }
+                        
+                        b.va = Math.min(Math.max(b.va, -10), 10);
 
                         b.vx = Math.min(Math.max(b.vx, -MAX_SPEED), MAX_SPEED);
                         b.vy = Math.min(Math.max(b.vy, -MAX_SPEED), MAX_SPEED);
