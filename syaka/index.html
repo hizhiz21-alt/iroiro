@@ -3,19 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカするやつ</title>
+    <title>シャカシャカ</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25)); }
         .box img { width: 100%; height: auto; display: block; pointer-events: none; user-select: none; }
         button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 1000; border-radius: 50px; border: none; background: #333; color: white; cursor: pointer; }
+        
+        /* 追加ボタンのスタイル */
+        .controls { position: absolute; top: 10px; right: 10px; z-index: 2000; display: none; gap: 8px; }
+        .ctrl-btn { position: static; transform: none; padding: 10px 15px; font-size: 14px; background: rgba(51, 51, 51, 0.8); }
     </style>
 </head>
 <body>
     <button id="startBtn">スタート</button>
+    <div id="controls" class="controls">
+        <button id="addBtn" class="ctrl-btn">もう10連</button>
+        <button id="resetBtn" class="ctrl-btn">↻</button>
+    </div>
+
     <script>
         const size = 140;        
-        const smallSize = 100;   
+        const smallSize = 80;   
         const gachaCount = 10;   
         
         const FRICTION = 0.92;      
@@ -26,6 +35,9 @@
 
         const boxes = [];
         const btn = document.getElementById('startBtn');
+        const controls = document.getElementById('controls');
+        const addBtn = document.getElementById('addBtn');
+        const resetBtn = document.getElementById('resetBtn');
 
         function pickGachaImage() {
             const rand = Math.random() * 100;
@@ -34,6 +46,7 @@
             return 4;                      
         }
 
+        // 初期の3個と最初の10連
         for (let i = 1; i <= 3; i++) createBox(i, i <= 2 ? size : smallSize, 100 + i);
         for (let i = 0; i < gachaCount; i++) createBox(pickGachaImage(), smallSize, 10);
 
@@ -63,24 +76,42 @@
                 data.vy = (touch.clientY - (data.h / 2) - data.py) * 0.3;
                 data.px = touch.clientX - (data.w / 2);
                 data.py = touch.clientY - (data.h / 2);
-                data.va = data.vx * 0.1; // ドラッグ時も適度に回る
+                data.va = data.vx * 0.1;
             }, {passive: false});
             window.addEventListener('touchend', () => { data.isDragging = false; });
             boxes.push(data);
+            return data;
+        }
+
+        function dropBox(b) {
+            b.px = Math.random() * (window.innerWidth - b.w);
+            b.py = -300 - (Math.random() * 500); 
+            b.vy = 15 + Math.random() * 10;
+            b.va = (Math.random() - 0.5) * 10;
+            b.el.style.display = 'block';
         }
 
         btn.onclick = () => {
-            boxes.forEach(b => {
-                b.px = Math.random() * (window.innerWidth - b.w);
-                b.py = -500 - (Math.random() * 1000); 
-                b.vy = 15 + Math.random() * 10;
-                b.va = (Math.random() - 0.5) * 10;
-                b.el.style.display = 'block';
-            });
+            boxes.forEach(b => dropBox(b));
             if (typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission().then(run);
             } else { run(); }
             btn.style.display = 'none';
+            controls.style.display = 'flex';
+        };
+
+        // 「もう10連」ボタンの処理
+        addBtn.onclick = () => {
+            for (let i = 0; i < 10; i++) {
+                const newBox = createBox(pickGachaImage(), smallSize, 10);
+                // 読み込み完了を待たずに位置設定して表示
+                dropBox(newBox);
+            }
+        };
+
+        // 「↻」ボタンの処理
+        resetBtn.onclick = () => {
+            boxes.forEach(b => dropBox(b));
         };
 
         function run() {
@@ -96,7 +127,6 @@
                     if (!b.isDragging) {
                         b.vx -= ax * 0.8 * flip; 
                         b.vy += ay * 0.8 * flip;
-                        // 振っているときは適度に回す
                         b.va -= ax * 0.2; 
                     }
                 });
@@ -128,7 +158,6 @@
                         b.vy *= FRICTION;
                         
                         let moveSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-                        // 止まったらえんえん回るのをやめる
                         if (moveSpeed < 1.0) {
                             b.va *= 0.5; 
                         } else {
@@ -152,7 +181,6 @@
                         if (b.py > bottomWall) { 
                             b.py = bottomWall; 
                             b.vy *= -BOUNCE;
-                            // 下端でのプルプルを強力に抑制
                             if (Math.abs(b.vy) < 2.5) b.vy = 0; 
                         }
                     }
