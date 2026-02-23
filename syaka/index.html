@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカ</title>
+    <title>シャカシャカするやつ</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25)); }
@@ -25,12 +25,11 @@
         const smallSize = 100;   
         const gachaCount = 10;   
         
-        // 物理パラメータ（元の数値を維持）
         const FRICTION = 0.95;      
         const ROT_FRICTION = 0.92;  
         const BOUNCE = 0.3;         
         const GRAVITY = 0.6;        
-        const MAX_SPEED = 15;       
+        const MAX_SPEED = 20; // 詰まり解消のため少し上限解放
 
         let boxes = []; 
         const btn = document.getElementById('startBtn');
@@ -68,8 +67,8 @@
             window.addEventListener('touchmove', (e) => {
                 if (!data.isDragging) return;
                 let touch = e.touches[0];
-                data.vx = (touch.clientX - (data.w / 2) - data.px) * 0.2;
-                data.vy = (touch.clientY - (data.h / 2) - data.py) * 0.2;
+                data.vx = (touch.clientX - (data.w / 2) - data.px) * 0.3;
+                data.vy = (touch.clientY - (data.h / 2) - data.py) * 0.3;
                 data.px = touch.clientX - (data.w / 2);
                 data.py = touch.clientY - (data.h / 2);
             }, {passive: false});
@@ -80,10 +79,10 @@
 
         function dropBox(b) {
             b.px = Math.random() * (window.innerWidth - b.w);
-            b.py = -300 - (Math.random() * 500); 
-            b.vx = (Math.random() - 0.5) * 10;
-            b.vy = 10 + Math.random() * 10;
-            b.va = (Math.random() - 0.5) * 5;
+            b.py = -200 - (Math.random() * 400); 
+            b.vx = (Math.random() - 0.5) * 15;
+            b.vy = 5 + Math.random() * 10;
+            b.va = (Math.random() - 0.5) * 10;
             b.el.style.display = 'block';
         }
 
@@ -126,15 +125,15 @@
                 if(!ag || ag.x === null) return;
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
-                        b.vx -= ag.x * 0.5 * flip; 
-                        b.vy += ag.y * 0.5 * flip;
+                        b.vx -= ag.x * 0.6 * flip; 
+                        b.vy += ag.y * 0.6 * flip;
                     }
                 });
             });
 
             function update() {
-                // スタック防止のための反復計算（2回実施）
-                for (let iter = 0; iter < 2; iter++) {
+                // 衝突判定：反復回数を増やし、押し出しを強力に
+                for (let iter = 0; iter < 3; iter++) {
                     for (let i = 0; i < boxes.length; i++) {
                         for (let j = i + 1; j < boxes.length; j++) {
                             let a = boxes[i], b = boxes[j];
@@ -142,26 +141,26 @@
                             
                             let dx = (b.px + b.w/2) - (a.px + a.w/2);
                             let dy = (b.py + b.h/2) - (a.py + a.h/2);
-                            let dist = Math.sqrt(dx * dx + dy * dy);
-                            // 判定距離をわずかに調整して隙間を確保
-                            let minDist = (a.w + b.w) * 0.45; 
+                            let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                            let minDist = (a.w + b.w) * 0.48; // 判定を広げて密着を防ぐ
 
                             if (dist < minDist) {
-                                let overlap = (minDist - dist) * 0.5;
+                                let overlap = minDist - dist;
                                 let nx = dx / dist;
                                 let ny = dy / dist;
                                 
-                                if (!a.isDragging) { 
-                                    a.px -= nx * overlap; 
-                                    a.py -= ny * overlap; 
-                                    a.vx -= nx * 0.1; 
-                                    a.vy -= ny * 0.1; 
+                                // 重なった瞬間に、座標を強制的に外へ。
+                                // 0.5だと押し出しきれないので、少し強めに（0.7）設定。
+                                let ratio = 0.7;
+                                if (!a.isDragging) {
+                                    a.px -= nx * overlap * ratio;
+                                    a.py -= ny * overlap * ratio;
+                                    a.vx -= nx * 0.4; // 速度にも少し反発を乗せる
                                 }
-                                if (!b.isDragging) { 
-                                    b.px += nx * overlap; 
-                                    b.py += ny * overlap; 
-                                    b.vx += nx * 0.1; 
-                                    b.vy += ny * 0.1; 
+                                if (!b.isDragging) {
+                                    b.px += nx * overlap * ratio;
+                                    b.py += ny * overlap * ratio;
+                                    b.vx += nx * 0.4;
                                 }
                             }
                         }
@@ -185,11 +184,11 @@
                         const rw = window.innerWidth - b.w;
                         const bh = window.innerHeight - b.h;
 
-                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; b.va *= 0.5; }
-                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; b.va *= 0.5; }
+                        // 壁判定：ここでも座標を強制固定してめり込み防止
+                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
+                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; }
                         if (b.py > bh) { 
                             b.py = bh; b.vy *= -BOUNCE; 
-                            b.va *= 0.5;
                             if (Math.abs(b.vy) < 1) b.vy = 0;
                         }
                         if (b.py < -1000) b.py = -1000;
