@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカするやつ</title>
+    <title>シャカシャカ</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25)); }
@@ -15,15 +15,15 @@
     <button id="startBtn">スタート</button>
     <script>
         const size = 140;        
-        const smallSize = 90;   
+        const smallSize = 100;   
         const gachaCount = 10;   
         
         // --- 物理設定 ---
         const FRICTION = 0.92;
         const ROT_FRICTION = 0.88;
-        const BOUNCE = 0.5;
+        const BOUNCE = 0.4;
         const GRAVITY = 0.4;
-        const MAX_SPEED = 12; // 垂直時の爆速を防ぐリミッター（好みの速さに調整してね）
+        const MAX_SPEED = 12;
 
         const boxes = [];
         const btn = document.getElementById('startBtn');
@@ -89,10 +89,13 @@
             window.addEventListener("devicemotion", (e) => {
                 let ag = e.accelerationIncludingGravity;
                 if(!ag || !ag.x) return;
+                // 加速度が小さいときは無視する（デッドゾーン）
+                let ax = Math.abs(ag.x) > 1.5 ? ag.x : 0;
+                let ay = Math.abs(ag.y) > 1.5 ? ag.y : 0;
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
-                        b.vx -= ag.x * 0.6 * flip; 
-                        b.vy += ag.y * 0.6 * flip;
+                        b.vx -= ax * 0.6 * flip; 
+                        b.vy += ay * 0.6 * flip;
                     }
                 });
             });
@@ -121,19 +124,30 @@
                         b.vy += GRAVITY; 
                         b.vx *= FRICTION; b.vy *= FRICTION; b.va *= ROT_FRICTION;
 
-                        // --- 速度リミッター適用 ---
+                        // 微小な動きをカット（ピタッと止める）
+                        if (Math.abs(b.vx) < 0.05) b.vx = 0;
+                        if (Math.abs(b.vy) < 0.05) b.vy = 0;
+                        if (Math.abs(b.va) < 0.01) b.va = 0;
+
                         b.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, b.vx));
                         b.vy = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, b.vy));
 
                         b.px += b.vx; b.py += b.vy; b.angle += b.va;
 
-                        // 隅っこスタック防止
-                        if (b.px < 0) { b.px = 2; b.vx *= -BOUNCE; b.va += (Math.random()-0.5)*3; }
-                        if (b.px > window.innerWidth - b.w) { b.px = window.innerWidth - b.w - 2; b.vx *= -BOUNCE; b.va += (Math.random()-0.5)*3; }
+                        // 隅っこ判定（必要な時だけ微振動を足す）
+                        if (b.px < 0) { 
+                            b.px = 0; b.vx *= -BOUNCE; 
+                            if(Math.abs(b.vx) > 1) b.va += (Math.random()-0.5)*3; 
+                        }
+                        if (b.px > window.innerWidth - b.w) { 
+                            b.px = window.innerWidth - b.w; b.vx *= -BOUNCE; 
+                            if(Math.abs(b.vx) > 1) b.va += (Math.random()-0.5)*3; 
+                        }
                         if (b.py > window.innerHeight - b.h) { 
-                            b.py = window.innerHeight - b.h - 2; 
+                            b.py = window.innerHeight - b.h; 
                             b.vy *= -BOUNCE; 
-                            if(Math.abs(b.vx) < 0.2) b.vx += (Math.random()-0.5)*2; 
+                            // 地面で完全に止まるための閾値
+                            if(Math.abs(b.vy) < 1) b.vy = 0;
                         }
                     }
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
