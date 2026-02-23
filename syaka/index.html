@@ -26,6 +26,7 @@
         const smallSize = 100;   
         const gachaCount = 10;   
         
+        // --- 物理設定（あなたが調整した数値をベースに最適化） ---
         const FRICTION = 0.92;      
         const ROT_FRICTION = 0.85;  
         const BOUNCE = 0.2;         
@@ -115,9 +116,6 @@
                 if (!b.isInitial) {
                     b.el.remove();
                 } else {
-                    // 初期10連分（画像4〜6を使用しているもの）だけ画像を再抽選
-                    // iが1〜3の固定画像はそのままにしたい場合は条件を分けますが、
-                    // ガチャ結果を変えるという意図に合わせ、pickGachaImageを使うパーツを更新
                     if (b.w === smallSize) { 
                         b.img.src = `${pickGachaImage()}.png`;
                     }
@@ -146,6 +144,7 @@
             });
 
             function update() {
+                // --- 衝突とスタック対策 ---
                 for (let i = 0; i < boxes.length; i++) {
                     for (let j = i + 1; j < boxes.length; j++) {
                         let a = boxes[i], b = boxes[j];
@@ -154,15 +153,27 @@
                         let dy = (b.py + b.h/2) - (a.py + a.h/2);
                         let dist = Math.sqrt(dx * dx + dy * dy);
                         let minDist = ((a.w + b.w) / 4 + (a.h + b.h) / 4) * 0.82; 
+                        
                         if (dist < minDist) {
                             let force = (minDist - dist) / dist;
-                            let mx = dx * force * 0.2; 
-                            let my = dy * force * 0.2;
-                            if(!a.isDragging) { a.vx -= mx; a.vy -= my; a.va += mx * 0.01; }
-                            if(!b.isDragging) { b.vx += mx; b.vy += my; b.va -= mx * 0.01; }
+                            // スタック防止：座標を直接引き離す力を追加
+                            let pushX = dx * force * 0.4;
+                            let pushY = dy * force * 0.4;
+                            
+                            if(!a.isDragging) { 
+                                a.vx -= pushX * 0.2; a.vy -= pushY * 0.2; 
+                                a.px -= pushX; a.py -= pushY; // 直接ずらす
+                                a.va += pushX * 0.01; 
+                            }
+                            if(!b.isDragging) { 
+                                b.vx += pushX * 0.2; b.vy += pushY * 0.2; 
+                                b.px += pushX; b.py += pushY; // 直接ずらす
+                                b.va -= pushX * 0.01; 
+                            }
                         }
                     }
                 }
+                
                 boxes.forEach(b => {
                     if (b.el.style.display === 'none') return;
                     if (!b.isDragging) {
@@ -177,6 +188,7 @@
                             b.va *= ROT_FRICTION;
                         }
 
+                        // 停止判定
                         if (Math.abs(b.vx) < 0.2) b.vx = 0;
                         if (Math.abs(b.vy) < 0.2) b.vy = 0;
                         if (Math.abs(b.va) < 0.1) b.va = 0;
@@ -189,12 +201,16 @@
                         const rightWall = window.innerWidth - b.w;
                         const bottomWall = window.innerHeight - b.h;
 
+                        // 壁判定と接地時の不自然な回転の抑制
                         if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
                         if (b.px > rightWall) { b.px = rightWall; b.vx *= -BOUNCE; }
                         if (b.py > bottomWall) { 
                             b.py = bottomWall; 
                             b.vy *= -BOUNCE;
-                            if (Math.abs(b.vy) < 2.5) b.vy = 0; 
+                            if (Math.abs(b.vy) < 2.5) {
+                                b.vy = 0;
+                                b.va *= 0.8; // 接地中は回転をより強く抑える
+                            }
                         }
                     }
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
