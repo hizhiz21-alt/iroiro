@@ -147,26 +147,28 @@
                         let dist = Math.sqrt(dx * dx + dy * dy) || 1;
                         let minDist = (a.w + b.w) * 0.48;
 
-                        if (dist < minDist) {
+                        // 【案2：遊びの設定】
+                        // めり込みが2px以下の場合は、あえて何もしない「遊び」を導入
+                        if (dist < minDist - 2) {
                             let overlap = (minDist - dist);
                             let nx = dx / dist;
                             let ny = dy / dist;
                             
-                            // 速度の反発（アクリル同士がコツンと当たる感覚）
                             let relativeVx = b.vx - a.vx;
                             let relativeVy = b.vy - a.vy;
                             let velAlongNormal = relativeVx * nx + relativeVy * ny;
 
                             if (velAlongNormal < 0) {
-                                let impulse = -1.2 * velAlongNormal;
+                                // 少し弾みを抑えて「コツン」という質感に
+                                let impulse = -1.1 * velAlongNormal;
                                 impulse /= 2;
                                 if (!a.isDragging) { a.vx -= nx * impulse; a.vy -= ny * impulse; }
                                 if (!b.isDragging) { b.vx += nx * impulse; b.vy += ny * impulse; }
                             }
 
-                            // 物理的な重なり解消（最小限の押し出し）
-                            let moveX = nx * overlap * 0.5;
-                            let moveY = ny * overlap * 0.5;
+                            // 重なり解消の際も少し弱めに（0.5→0.3）戻すことで震えを防止
+                            let moveX = nx * overlap * 0.3;
+                            let moveY = ny * overlap * 0.3;
                             if (!a.isDragging) { a.px -= moveX; a.py -= moveY; }
                             if (!b.isDragging) { b.px += moveX; b.py += moveY; }
                         }
