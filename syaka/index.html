@@ -25,11 +25,12 @@
         const smallSize = 100;   
         const gachaCount = 10;   
         
+        // 物理パラメータ（一切変えていません）
         const FRICTION = 0.95;      
         const ROT_FRICTION = 0.92;  
         const BOUNCE = 0.3;         
         const GRAVITY = 0.6;        
-        const MAX_SPEED = 20; // 詰まり解消のため少し上限解放
+        const MAX_SPEED = 20; 
 
         let boxes = []; 
         const btn = document.getElementById('startBtn');
@@ -132,30 +133,24 @@
             });
 
             function update() {
-                // 衝突判定：反復回数を増やし、押し出しを強力に
                 for (let iter = 0; iter < 3; iter++) {
                     for (let i = 0; i < boxes.length; i++) {
                         for (let j = i + 1; j < boxes.length; j++) {
                             let a = boxes[i], b = boxes[j];
                             if (a.h === 0 || b.h === 0) continue;
-                            
                             let dx = (b.px + b.w/2) - (a.px + a.w/2);
                             let dy = (b.py + b.h/2) - (a.py + a.h/2);
                             let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                            let minDist = (a.w + b.w) * 0.48; // 判定を広げて密着を防ぐ
-
+                            let minDist = (a.w + b.w) * 0.48; 
                             if (dist < minDist) {
                                 let overlap = minDist - dist;
                                 let nx = dx / dist;
                                 let ny = dy / dist;
-                                
-                                // 重なった瞬間に、座標を強制的に外へ。
-                                // 0.5だと押し出しきれないので、少し強めに（0.7）設定。
                                 let ratio = 0.7;
                                 if (!a.isDragging) {
                                     a.px -= nx * overlap * ratio;
                                     a.py -= ny * overlap * ratio;
-                                    a.vx -= nx * 0.4; // 速度にも少し反発を乗せる
+                                    a.vx -= nx * 0.4;
                                 }
                                 if (!b.isDragging) {
                                     b.px += nx * overlap * ratio;
@@ -174,8 +169,8 @@
                         b.vy *= FRICTION;
                         b.va *= ROT_FRICTION;
 
-                        b.vx = Math.min(Math.max(b.vx, -MAX_SPEED), MAX_SPEED);
-                        b.vy = Math.min(Math.max(b.vy, -MAX_SPEED), MAX_SPEED);
+                        // ★ここを追加：移動に合わせて回転を加える
+                        b.va += b.vx * 0.1;
 
                         b.px += b.vx;
                         b.py += b.vy;
@@ -184,9 +179,8 @@
                         const rw = window.innerWidth - b.w;
                         const bh = window.innerHeight - b.h;
 
-                        // 壁判定：ここでも座標を強制固定してめり込み防止
-                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
-                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; }
+                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; b.va *= 0.5; }
+                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; b.va *= 0.5; }
                         if (b.py > bh) { 
                             b.py = bh; b.vy *= -BOUNCE; 
                             if (Math.abs(b.vy) < 1) b.vy = 0;
