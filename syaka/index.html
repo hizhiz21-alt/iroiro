@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカ</title>
+    <title>シャカシャカするやつ</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25)); }
@@ -18,12 +18,11 @@
         const smallSize = 100;   
         const gachaCount = 10;   
         
-        // --- 物理設定：摩擦を強め、跳ね返りを最小限に ---
-        const FRICTION = 0.92;      // 摩擦を強化
-        const ROT_FRICTION = 0.85;  // 回転の減衰を大幅に強化
-        const BOUNCE = 0.2;         // 跳ね返りをほぼ殺す（プルプル防止）
-        const GRAVITY = 0.7;        // 重力を重くして安定させる
-        const MAX_SPEED = 18;       
+        const FRICTION = 0.96;      
+        const ROT_FRICTION = 0.98;  // 回転自体の減衰は緩やかに（振ってる時は回る）
+        const BOUNCE = 0.4;         
+        const GRAVITY = 0.6;        
+        const MAX_SPEED = 20;       
 
         const boxes = [];
         const btn = document.getElementById('startBtn');
@@ -64,6 +63,7 @@
                 data.vy = (touch.clientY - (data.h / 2) - data.py) * 0.3;
                 data.px = touch.clientX - (data.w / 2);
                 data.py = touch.clientY - (data.h / 2);
+                data.va = data.vx * 2; // 手で動かした時は回す
             }, {passive: false});
             window.addEventListener('touchend', () => { data.isDragging = false; });
             boxes.push(data);
@@ -74,7 +74,7 @@
                 b.px = Math.random() * (window.innerWidth - b.w);
                 b.py = -500 - (Math.random() * 1000); 
                 b.vy = 15 + Math.random() * 10;
-                b.va = (Math.random() - 0.5) * 10;
+                b.va = (Math.random() - 0.5) * 20;
                 b.el.style.display = 'block';
             });
             if (typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -90,12 +90,14 @@
             window.addEventListener("devicemotion", (e) => {
                 let ag = e.accelerationIncludingGravity;
                 if(!ag || !ag.x) return;
-                let ax = Math.abs(ag.x) > 1.2 ? ag.x : 0;
-                let ay = Math.abs(ag.y) > 1.2 ? ag.y : 0;
+                let ax = Math.abs(ag.x) > 0.8 ? ag.x : 0;
+                let ay = Math.abs(ag.y) > 0.8 ? ag.y : 0;
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
                         b.vx -= ax * 0.8 * flip; 
                         b.vy += ay * 0.8 * flip;
+                        // 振っている加速度を回転エネルギーに変換
+                        b.va -= ax * 0.5; 
                     }
                 });
             });
@@ -108,14 +110,13 @@
                         let dx = (b.px + b.w/2) - (a.px + a.w/2);
                         let dy = (b.py + b.h/2) - (a.py + a.h/2);
                         let dist = Math.sqrt(dx * dx + dy * dy);
-                        
                         let minDist = ((a.w + b.w) / 4 + (a.h + b.h) / 4) * 0.82; 
                         if (dist < minDist) {
                             let force = (minDist - dist) / dist;
                             let mx = dx * force * 0.45; 
                             let my = dy * force * 0.45;
-                            if(!a.isDragging) { a.vx -= mx; a.vy -= my; a.va += mx * 0.01; }
-                            if(!b.isDragging) { b.vx += mx; b.vy += my; b.va -= mx * 0.01; }
+                            if(!a.isDragging) { a.vx -= mx; a.vy -= my; a.va += mx * 0.1; }
+                            if(!b.isDragging) { b.vx += mx; b.vy += my; b.va -= mx * 0.1; }
                         }
                     }
                 }
@@ -125,15 +126,19 @@
                         b.vy += GRAVITY; 
                         b.vx *= FRICTION; 
                         b.vy *= FRICTION;
-                        b.va *= ROT_FRICTION;
-
-                        // 移動が止まれば回転も連動して強力に減衰
+                        
+                        // 回転の動的減衰
                         let moveSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-                        if (moveSpeed < 1.5) b.va *= 0.7;
+                        if (moveSpeed < 2.0) {
+                            // 移動が止まりそうなら回転に強いブレーキをかける
+                            b.va *= 0.85; 
+                        } else {
+                            // 動いている時は自然に減衰させるだけ
+                            b.va *= ROT_FRICTION;
+                        }
 
-                        // 停止判定を厳しく（微振動カット）
-                        if (Math.abs(b.vx) < 0.2) b.vx = 0;
-                        if (Math.abs(b.vy) < 0.2) b.vy = 0;
+                        if (Math.abs(b.vx) < 0.1) b.vx = 0;
+                        if (Math.abs(b.vy) < 0.1) b.vy = 0;
                         if (Math.abs(b.va) < 0.1) b.va = 0;
 
                         b.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, b.vx));
@@ -144,13 +149,12 @@
                         const rightWall = window.innerWidth - b.w;
                         const bottomWall = window.innerHeight - b.h;
 
-                        // 壁判定：めり込みを即座に修正し、跳ね返り後の余韻を消す
-                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
-                        if (b.px > rightWall) { b.px = rightWall; b.vx *= -BOUNCE; }
+                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; b.va += b.vy * 0.1; }
+                        if (b.px > rightWall) { b.px = rightWall; b.vx *= -BOUNCE; b.va -= b.vy * 0.1; }
                         if (b.py > bottomWall) { 
                             b.py = bottomWall; 
                             b.vy *= -BOUNCE;
-                            if (Math.abs(b.vy) < 2.5) b.vy = 0; // 下端でのプルプルを強力に抑制
+                            if (Math.abs(b.vy) < 1.5) b.vy = 0;
                         }
                     }
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
