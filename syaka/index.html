@@ -8,16 +8,16 @@
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; }
         .box img { width: 100%; height: auto; display: block; pointer-events: none; user-select: none; }
-        button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 1000; }
+        button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 1000; border-radius: 50px; border: none; background: #333; color: white; }
     </style>
 </head>
 <body>
     <button id="startBtn">スタート</button>
     <script>
         // --- 設定エリア ---
-        const size = 140;        // 1〜2枚目のサイズ
-        const smallSize = 90;   // 3枚目以降のサイズ
-        const copyCount = 10;    // 【新機能】4.png を何枚出すか？（今は10枚）
+        const size = 140;        
+        const smallSize = 90;   
+        const gachaCount = 10;   // ガチャパーツの合計数
         
         const FRICTION = 0.92;      
         const ROT_FRICTION = 0.88;  
@@ -27,22 +27,31 @@
         const boxes = [];
         const btn = document.getElementById('startBtn');
 
-        // 合計枚数：固有画像(3枚) + 4.pngのコピー数
-        const totalNum = 3 + copyCount;
+        // ガチャの抽選ロジック
+        function pickGachaImage() {
+            const rand = Math.random() * 100;
+            if (rand < 6) return 6;        // 6% で 6.png
+            if (rand < 6 + 10) return 5;   // 10% で 5.png
+            return 4;                      // 残りは 4.png
+        }
 
-        for (let i = 1; i <= totalNum; i++) {
+        // 1. メインの1, 2, 3枚目を生成
+        for (let i = 1; i <= 3; i++) {
+            createBox(i, i <= 2 ? size : smallSize);
+        }
+
+        // 2. ガチャパーツを10個生成
+        for (let i = 0; i < gachaCount; i++) {
+            createBox(pickGachaImage(), smallSize);
+        }
+
+        function createBox(imgNum, currentWidth) {
             const div = document.createElement('div');
             div.className = 'box';
-            
-            // サイズ設定：1〜2枚目は大きく、3枚目以降は小さく
-            const currentWidth = (i >= 3) ? smallSize : size;
             div.style.width = currentWidth + 'px';
             
             const img = new Image();
-            // 画像名の決定：1, 2, 3 まではそのまま。それ以降は全部 4.png
-            const imgNum = (i <= 3) ? i : 4;
             img.src = `${imgNum}.png`;
-            
             div.appendChild(img);
             document.body.appendChild(div);
 
@@ -50,10 +59,10 @@
                 el: div, 
                 px: Math.random() * (window.innerWidth - currentWidth), 
                 py: Math.random() * (window.innerHeight - currentWidth),
-                vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, 
+                vx: (Math.random() - 0.5) * 20, vy: (Math.random() - 0.5) * 20, 
                 angle: Math.random() * 360, va: 0,
                 w: currentWidth, h: currentWidth,
-                mass: (i >= 3) ? 0.7 : 1.1,
+                mass: currentWidth > 150 ? 1.1 : 0.7,
                 isDragging: false
             };
 
