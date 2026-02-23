@@ -5,68 +5,97 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>シャカシャカ</title>
     <style>
-        html, body { margin: 0; overflow: hidden; position: fixed; width: 100%; height: 100%; background: #f0f0f0; touch-action: none; }
-        .box { position: absolute; will-change: transform; }
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
+        .box { position: absolute; will-change: transform; left: 0; top: 0; }
         .box img { width: 100px; height: auto; display: block; pointer-events: none; }
-        /* 画像がない時の代わりの箱 */
-        .no-img { width: 100px; height: 100px; background: #ccc; display: flex; justify-content: center; align-items: center; font-size: 40px; }
-        button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; z-index: 1000; }
+        button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 1000; }
     </style>
 </head>
 <body>
-    <button id="startBtn">スタート！ 🔥</button>
+    <button id="startBtn">スタート 🔥</button>
     <script>
         const boxes = [];
-        // ここを 1〜2 など、今持ってる枚数に合わせて変えるだけでOK！
-        const numImages = 9; 
+        const btn = document.getElementById('startBtn');
+        const numImages = 9;
 
         for (let i = 1; i <= numImages; i++) {
             const div = document.createElement('div');
             div.className = 'box';
-            
             const img = new Image();
             img.src = `${i}.png`;
-            // 画像が見つからなかったら文字を出す
-            img.onerror = () => {
-                div.innerHTML = `<div class="no-img">📷</div>`;
-                data.h = 100;
-            };
-            img.onload = () => { data.h = 100 * (img.naturalHeight / img.naturalWidth); };
-            
             div.appendChild(img);
             document.body.appendChild(div);
 
             const data = {
-                el: div, px: Math.random()*200, py: Math.random()*200,
-                vx: 0, vy: 0, angle: 0, va: 0, w: 100, h: 100, isDragging: false
+                el: div, 
+                px: Math.random() * (window.innerWidth - 100), 
+                py: Math.random() * (window.innerHeight - 100),
+                vx: (Math.random() - 0.5) * 20, // 最初からバラバラの速度
+                vy: (Math.random() - 0.5) * 20,
+                angle: Math.random() * 360,
+                va: (Math.random() - 0.5) * 10, // バラバラの回転
+                w: 100, h: 100,
+                mass: 0.8 + Math.random() // それぞれに「重さ」の個性を出す
             };
+            img.onload = () => { data.h = 100 * (img.naturalHeight / img.naturalWidth); };
+            img.onerror = () => { img.style.display = 'none'; data.h = 0; };
             boxes.push(data);
         }
 
-        document.getElementById('startBtn').onclick = function() {
+        btn.onclick = () => {
             if (typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission().then(run);
             } else { run(); }
-            this.style.display = 'none';
+            btn.style.display = 'none';
         };
 
         function run() {
             window.addEventListener("devicemotion", (e) => {
                 let ag = e.accelerationIncludingGravity;
+                if(!ag.x) return;
                 boxes.forEach(b => { 
-                    b.vx -= ag.x * 0.7; b.vy += ag.y * 0.7; b.va += ag.x * 0.4;
+                    // 重さ(mass)によって加速の仕方を変える
+                    b.vx -= ag.x * b.mass; 
+                    b.vy += ag.y * b.mass;
+                    b.va += ag.x * (b.mass - 1);
                 });
             });
 
             function update() {
+                // 衝突判定：力強く弾き返す
+                for (let i = 0; i < boxes.length; i++) {
+                    for (let j = i + 1; j < boxes.length; j++) {
+                        let a = boxes[i], b = boxes[j];
+                        if (a.h === 0 || b.h === 0) continue;
+
+                        let dx = (b.px + 50) - (a.px + 50);
+                        let dy = (b.py + b.h/2) - (a.py + a.h/2);
+                        let dist = Math.sqrt(dx * dx + dy * dy);
+                        let minDist = (a.h + b.h) / 4 + 50; // 簡易的な距離判定
+
+                        if (dist < minDist) {
+                            // ぶつかったら反発させる
+                            let force = (minDist - dist) / dist;
+                            let mx = dx * force * 0.5;
+                            let my = dy * force * 0.5;
+                            a.vx -= mx; a.vy -= my;
+                            b.vx += mx; b.vy += my;
+                            a.va += mx * 0.1; b.va -= mx * 0.1;
+                        }
+                    }
+                }
+
                 boxes.forEach(b => {
-                    b.vx *= 0.95; b.vy *= 0.95; b.va *= 0.95;
+                    if (b.h === 0) return;
+                    b.vx *= 0.94; b.vy *= 0.94; b.va *= 0.94;
                     b.px += b.vx; b.py += b.vy; b.angle += b.va;
+
                     // 壁判定
-                    if (b.px < 0) { b.px = 0; b.vx *= -0.8; }
-                    if (b.px > window.innerWidth - 100) { b.px = window.innerWidth - 100; b.vx *= -0.8; }
-                    if (b.py < 0) { b.py = 0; b.vy *= -0.8; }
-                    if (b.py > window.innerHeight - b.h) { b.py = window.innerHeight - b.h; b.vy *= -0.8; }
+                    if (b.px < 0) { b.px = 0; b.vx *= -0.7; }
+                    if (b.px > window.innerWidth - 100) { b.px = window.innerWidth - 100; b.vx *= -0.7; }
+                    if (b.py < 0) { b.py = 0; b.vy *= -0.7; }
+                    if (b.py > window.innerHeight - b.h) { b.py = window.innerHeight - b.h; b.vy *= -0.7; }
+
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
                 });
                 requestAnimationFrame(update);
