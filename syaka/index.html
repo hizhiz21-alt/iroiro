@@ -26,8 +26,8 @@
         const gachaCount = 10;   
         
         const FRICTION = 0.95;      
-        const ROT_FRICTION = 0.90; // ブレーキを少し強化
-        const BOUNCE = 0.2;        // 跳ね返りを抑えて落ち着かせる
+        const ROT_FRICTION = 0.80; // 回転のブレーキをさらに強化
+        const BOUNCE = 0.2;        
         const GRAVITY = 0.6;        
         const MAX_SPEED = 20;
 
@@ -137,53 +137,55 @@
             });
 
             function update() {
-                for (let i = 0; i < boxes.length; i++) {
-                    for (let j = i + 1; j < boxes.length; j++) {
-                        let a = boxes[i], b = boxes[j];
-                        if (a.h === 0 || b.h === 0) continue;
-                        
-                        let dx = (b.px + b.w/2) - (a.px + a.w/2);
-                        let dy = (b.py + b.h/2) - (a.py + a.h/2);
-                        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                        let minDist = (a.w + b.w) * 0.48;
-
-                        if (dist < minDist - 3) { // 遊び（隙間）を3pxに拡大して安定化
-                            let overlap = (minDist - dist);
-                            let nx = dx / dist;
-                            let ny = dy / dist;
+                // 重なり解消の精度を上げるためループを2回に
+                for (let step = 0; step < 2; step++) {
+                    for (let i = 0; i < boxes.length; i++) {
+                        for (let j = i + 1; j < boxes.length; j++) {
+                            let a = boxes[i], b = boxes[j];
+                            if (a.h === 0 || b.h === 0) continue;
                             
-                            let relativeVx = b.vx - a.vx;
-                            let relativeVy = b.vy - a.vy;
-                            let velAlongNormal = relativeVx * nx + relativeVy * ny;
+                            let dx = (b.px + b.w/2) - (a.px + a.w/2);
+                            let dy = (b.py + b.h/2) - (a.py + a.h/2);
+                            let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                            let minDist = (a.w + b.w) * 0.49; // 判定をより厳密に
 
-                            if (velAlongNormal < -0.1) {
-                                let impulse = -1.1 * velAlongNormal;
-                                impulse /= 2;
-                                if (!a.isDragging) { a.vx -= nx * impulse; a.vy -= ny * impulse; }
-                                if (!b.isDragging) { b.vx += nx * impulse; b.vy += ny * impulse; }
+                            if (dist < minDist) {
+                                let overlap = (minDist - dist);
+                                let nx = dx / dist;
+                                let ny = dy / dist;
+                                
+                                let relativeVx = b.vx - a.vx;
+                                let relativeVy = b.vy - a.vy;
+                                let velAlongNormal = relativeVx * nx + relativeVy * ny;
+
+                                if (velAlongNormal < -0.1) {
+                                    let impulse = -1.2 * velAlongNormal;
+                                    impulse /= 2;
+                                    if (!a.isDragging) { a.vx -= nx * impulse; a.vy -= ny * impulse; }
+                                    if (!b.isDragging) { b.vx += nx * impulse; b.vy += ny * impulse; }
+                                }
+
+                                // 重なりをよりしっかり押し出す(0.2 -> 0.45)
+                                let moveX = nx * overlap * 0.45;
+                                let moveY = ny * overlap * 0.45;
+                                if (!a.isDragging) { a.px -= moveX; a.py -= moveY; }
+                                if (!b.isDragging) { b.px += moveX; b.py += moveY; }
                             }
-
-                            let moveX = nx * overlap * 0.2;
-                            let moveY = ny * overlap * 0.2;
-                            if (!a.isDragging) { a.px -= moveX; a.py -= moveY; }
-                            if (!b.isDragging) { b.px += moveX; b.py += moveY; }
                         }
                     }
                 }
 
                 boxes.forEach(b => {
                     if (!b.isDragging) {
-                        // 1. まず摩擦と重力を計算
                         b.vy += GRAVITY;
                         b.vx *= FRICTION;
                         b.vy *= FRICTION;
                         b.va *= ROT_FRICTION;
 
-                        // 2. 【超重要】「不気味な動き」を止める絶対的な閾値
-                        // 速度が極小（0.1以下）なら、物理計算を打ち切って完全停止させる
                         if (Math.abs(b.vx) < 0.1) b.vx = 0;
                         if (Math.abs(b.vy) < 0.1 && Math.abs(b.vy + GRAVITY) < 1) b.vy = 0;
-                        if (Math.abs(b.va) < 0.01) b.va = 0; 
+                        // 回転の停止閾値を上げ、ゆっくり回るのを阻止
+                        if (Math.abs(b.va) < 0.2) b.va = 0; 
 
                         b.vx = Math.min(Math.max(b.vx, -MAX_SPEED), MAX_SPEED);
                         b.vy = Math.min(Math.max(b.vy, -MAX_SPEED), MAX_SPEED);
