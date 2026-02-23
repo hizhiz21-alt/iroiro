@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカ</title>
+    <title>シャカシャカするやつ</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
-        .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.15)); }
+        .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
         .box img { width: 100%; height: auto; display: block; pointer-events: none; user-select: none; }
         button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 1000; border-radius: 50px; border: none; background: #333; color: white; cursor: pointer; }
     </style>
@@ -18,12 +18,12 @@
         const smallSize = 90;   
         const gachaCount = 10;   
         
-        // --- 最終調整した数値 ---
-        const FRICTION = 0.95;      // 適度な摩擦
-        const ROT_FRICTION = 0.82;  // 回転に強めのブレーキ（回りすぎ防止）
-        const BOUNCE = 0.3;         // 適度な反発
-        const GRAVITY = 0.4;        // 自然な重力
-        // ------------------------
+        // --- まともだった頃の物理定数 ---
+        const FRICTION = 0.92;
+        const ROT_FRICTION = 0.88;
+        const BOUNCE = 0.6;
+        const GRAVITY = 0.4;
+        // ------------------------------
 
         const boxes = [];
         const btn = document.getElementById('startBtn');
@@ -50,23 +50,19 @@
             const data = {
                 el: div, px: 0, py: 0, vx: 0, vy: 0, 
                 angle: Math.random() * 360, va: 0,
-                w: currentWidth, h: currentWidth,
-                mass: currentWidth > 150 ? 1.2 : 0.8,
+                w: currentWidth, h: 0,
                 isDragging: false
             };
-
             img.onload = () => { data.h = currentWidth * (img.naturalHeight / img.naturalWidth); };
             
             div.addEventListener('touchstart', () => { data.isDragging = true; });
             window.addEventListener('touchmove', (e) => {
                 if (!data.isDragging) return;
-                let touch = Array.from(e.touches).find(t => t.target === div || div.contains(t.target));
-                if (touch) {
-                    data.vx = (touch.clientX - (currentWidth / 2) - data.px) * 0.2;
-                    data.vy = (touch.clientY - (data.h / 2) - data.py) * 0.2;
-                    data.px = touch.clientX - (currentWidth / 2);
-                    data.py = touch.clientY - (data.h / 2);
-                }
+                let touch = e.touches[0];
+                data.vx = (touch.clientX - (data.w / 2) - data.px) * 0.2;
+                data.vy = (touch.clientY - (data.h / 2) - data.py) * 0.2;
+                data.px = touch.clientX - (data.w / 2);
+                data.py = touch.clientY - (data.h / 2);
             }, {passive: false});
             window.addEventListener('touchend', () => { data.isDragging = false; });
             boxes.push(data);
@@ -75,10 +71,8 @@
         btn.onclick = () => {
             boxes.forEach(b => {
                 b.px = Math.random() * (window.innerWidth - b.w);
-                b.py = -500 - (Math.random() * 1500); 
-                b.vy = 10 + Math.random() * 15;
-                b.vx = (Math.random() - 0.5) * 10;
-                b.va = (Math.random() - 0.5) * 10; // 降りる時の初期回転
+                b.py = -500 - (Math.random() * 1000); 
+                b.vy = 10 + Math.random() * 10;
                 b.el.style.display = 'block';
             });
             if (typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -113,11 +107,10 @@
                         let minDist = (a.w + b.w) / 4 + (a.h + b.h) / 4; 
                         if (dist < minDist) {
                             let force = (minDist - dist) / dist;
-                            let mx = dx * force * 0.5;
-                            let my = dy * force * 0.5;
-                            // 回転への変換率を 0.005 に下げて「バカ回転」を防止
-                            if(!a.isDragging) { a.vx -= mx; a.vy -= my; a.va += mx * 0.005; }
-                            if(!b.isDragging) { b.vx += mx; b.vy += my; b.va -= mx * 0.005; }
+                            let mx = dx * force * 0.3;
+                            let my = dy * force * 0.3;
+                            if(!a.isDragging) { a.vx -= mx; a.vy -= my; a.va += mx * 0.01; }
+                            if(!b.isDragging) { b.vx += mx; b.vy += my; b.va -= mx * 0.01; }
                         }
                     }
                 }
@@ -127,12 +120,12 @@
                         b.vy += GRAVITY; 
                         b.vx *= FRICTION; b.vy *= FRICTION; b.va *= ROT_FRICTION;
                         b.px += b.vx; b.py += b.vy; b.angle += b.va;
+
                         if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
                         if (b.px > window.innerWidth - b.w) { b.px = window.innerWidth - b.w; b.vx *= -BOUNCE; }
                         if (b.py > window.innerHeight - b.h) { 
                             b.py = window.innerHeight - b.h; 
                             b.vy *= -BOUNCE; 
-                            b.vx *= 0.5;
                         }
                     }
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
