@@ -25,8 +25,9 @@
         const smallSize = 100;   
         const gachaCount = 10;   
         
+        // すべて最初の設定値に戻しました
         const FRICTION = 0.95;      
-        const ROT_FRICTION = 0.80; // 回転の減衰を強めに戻す
+        const ROT_FRICTION = 0.80; 
         const BOUNCE = 0.2;        
         const GRAVITY = 0.6;        
         const MAX_SPEED = 20;
@@ -128,10 +129,10 @@
                         b.vx -= ag.x * 0.6 * flip; 
                         b.vy += ag.y * 0.6 * flip;
                         
-                        // 大きく振った（移動速度が出た）時だけ回転を加える
+                        // 最初の回転ロジック
                         const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-                        if (speed > 8) {
-                            b.va += (b.vx * 0.1);
+                        if (speed > 5) {
+                            b.va += (b.vx * 0.05);
                         }
                     }
                 });
@@ -150,17 +151,25 @@
                             let minDist = (a.w + b.w) * 0.49;
 
                             if (dist < minDist) {
-                                let nx = dx / dist, ny = dy / dist;
-                                let rvx = b.vx - a.vx, rvy = b.vy - a.vy;
-                                let velAlongNormal = rvx * nx + rvy * ny;
-
-                                if (velAlongNormal < 0) {
-                                    let j_impulse = -1.2 * velAlongNormal * 0.5;
-                                    if (!a.isDragging) { a.vx -= nx * j_impulse; a.vy -= ny * j_impulse; a.va *= 0.5; }
-                                    if (!b.isDragging) { b.vx += nx * j_impulse; b.vy += ny * j_impulse; b.va *= 0.5; }
-                                }
                                 let overlap = (minDist - dist);
-                                let moveX = nx * overlap * 0.45, moveY = ny * overlap * 0.45;
+                                if (overlap < 0.5) continue; 
+
+                                let nx = dx / dist;
+                                let ny = dy / dist;
+                                
+                                let relativeVx = b.vx - a.vx;
+                                let relativeVy = b.vy - a.vy;
+                                let velAlongNormal = relativeVx * nx + relativeVy * ny;
+
+                                if (velAlongNormal < -0.1) {
+                                    let impulse = -1.2 * velAlongNormal;
+                                    impulse /= 2;
+                                    if (!a.isDragging) { a.vx -= nx * impulse; a.vy -= ny * impulse; }
+                                    if (!b.isDragging) { b.vx += nx * impulse; b.vy += ny * impulse; }
+                                }
+
+                                let moveX = nx * overlap * 0.45;
+                                let moveY = ny * overlap * 0.45;
                                 if (!a.isDragging) { a.px -= moveX; a.py -= moveY; }
                                 if (!b.isDragging) { b.px += moveX; b.py += moveY; }
                             }
@@ -175,10 +184,17 @@
                         b.vy *= FRICTION;
                         b.va *= ROT_FRICTION;
 
-                        // 速度・回転の停止判定（スリープ）を厳格化
-                        if (Math.abs(b.vx) < 0.2) b.vx = 0;
-                        if (Math.abs(b.vy) < 0.2 && b.py > (window.innerHeight - b.h - 5)) b.vy = 0;
-                        if (Math.abs(b.va) < 0.1) b.va = 0;
+                        // 速度が落ちたら、回転も自然に止める（静止時のみに影響）
+                        if (Math.abs(b.vx) < 0.15 && Math.abs(b.vy) < 0.2) {
+                             b.va *= 0.7; 
+                        }
+
+                        if (Math.abs(b.vx) < 0.15) b.vx = 0;
+                        if (Math.abs(b.vy) < 0.15 && Math.abs(b.vy + GRAVITY) < 1) b.vy = 0;
+                        if (Math.abs(b.va) < 0.1) b.va = 0; // ここを少し厳しくして完全に止める
+
+                        b.vx = Math.min(Math.max(b.vx, -MAX_SPEED), MAX_SPEED);
+                        b.vy = Math.min(Math.max(b.vy, -MAX_SPEED), MAX_SPEED);
 
                         b.px += b.vx;
                         b.py += b.vy;
@@ -187,13 +203,13 @@
                         const rw = window.innerWidth - b.w;
                         const bh = window.innerHeight - b.h;
 
-                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; b.va *= 0.5; }
-                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; b.va *= 0.5; }
+                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
+                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; }
                         if (b.py > bh) { 
                             b.py = bh; b.vy *= -BOUNCE; 
-                            b.va *= 0.5;
                             if (Math.abs(b.vy) < 0.5) b.vy = 0;
                         }
+                        if (b.py < -1000) b.py = -1000;
                     }
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
                 });
