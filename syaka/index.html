@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカうごくやつ</title>
+    <title>シャカシャカ</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; }
-        /* 下のJSでサイズを制御するので、ここは width 100% でOK */
         .box img { width: 100%; height: auto; display: block; pointer-events: none; user-select: none; }
         button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 1000; }
     </style>
@@ -15,17 +14,23 @@
 <body>
     <button id="startBtn">スタート</button>
     <script>
-        // ★ここを変えるだけで大きさが全部変わります！★
-        const size = 120; 
+        // --- 設定エリア ---
+        const size = 130;      // 1〜2枚目のサイズ（一回り大きく！）
+        const smallSize = 80; // 3〜9枚目のサイズ（少し小さめに）
+        const numImages = 9;
+        // ----------------
 
         const boxes = [];
         const btn = document.getElementById('startBtn');
-        const numImages = 9;
 
         for (let i = 1; i <= numImages; i++) {
             const div = document.createElement('div');
             div.className = 'box';
-            div.style.width = size + 'px'; // サイズを適用
+            
+            // 3枚目(i=3)以降は小さいサイズを適用
+            const currentWidth = (i >= 3) ? smallSize : size;
+            div.style.width = currentWidth + 'px';
+            
             const img = new Image();
             img.src = `${i}.png`;
             div.appendChild(img);
@@ -33,17 +38,19 @@
 
             const data = {
                 el: div, 
-                px: Math.random() * (window.innerWidth - size), 
-                py: Math.random() * (window.innerHeight - size),
+                px: Math.random() * (window.innerWidth - currentWidth), 
+                py: Math.random() * (window.innerHeight - currentWidth),
                 vx: (Math.random() - 0.5) * 10,
                 vy: (Math.random() - 0.5) * 10,
                 angle: Math.random() * 360,
                 va: (Math.random() - 0.5) * 5,
-                w: size, h: size,
-                mass: 0.8 + Math.random(),
+                w: currentWidth, 
+                h: currentWidth, // onloadで更新
+                mass: (i >= 3) ? 0.8 : 1.2, // 大きい方が少し重たい動きに
                 isDragging: false
             };
-            img.onload = () => { data.h = size * (img.naturalHeight / img.naturalWidth); };
+
+            img.onload = () => { data.h = currentWidth * (img.naturalHeight / img.naturalWidth); };
             img.onerror = () => { img.style.display = 'none'; data.h = 0; };
 
             div.addEventListener('touchstart', () => {
@@ -54,7 +61,7 @@
                 if (!data.isDragging) return;
                 let touch = Array.from(e.touches).find(t => t.target === div || div.contains(t.target));
                 if (touch) {
-                    data.px = touch.clientX - (size / 2);
+                    data.px = touch.clientX - (currentWidth / 2);
                     data.py = touch.clientY - (data.h / 2);
                 }
             }, {passive: false});
@@ -88,14 +95,15 @@
                     for (let j = i + 1; j < boxes.length; j++) {
                         let a = boxes[i], b = boxes[j];
                         if (a.h === 0 || b.h === 0) continue;
-                        let dx = (b.px + a.w/2) - (a.px + a.w/2);
+                        let dx = (b.px + b.w/2) - (a.px + a.w/2);
                         let dy = (b.py + b.h/2) - (a.py + a.h/2);
                         let dist = Math.sqrt(dx * dx + dy * dy);
-                        let minDist = (a.h + b.h) / 4 + (size / 2);
+                        // それぞれの半径を足して判定
+                        let minDist = (a.w + b.w) / 4 + (a.h + b.h) / 4; 
                         if (dist < minDist) {
                             let force = (minDist - dist) / dist;
-                            let mx = dx * force * 0.5;
-                            let my = dy * force * 0.5;
+                            let mx = dx * force * 0.4;
+                            let my = dy * force * 0.4;
                             if(!a.isDragging) { a.vx -= mx; a.vy -= my; a.va += mx * 0.1; }
                             if(!b.isDragging) { b.vx += mx; b.vy += my; b.va -= mx * 0.1; }
                         }
