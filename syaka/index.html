@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカするやつ</title>
+    <title>シャカシャカ</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; }
         .box img { width: 100%; height: auto; display: block; pointer-events: none; user-select: none; }
-        button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 1000; border-radius: 50px; border: none; background: #333; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 1000; border-radius: 50px; border: none; background: #333; color: white; }
     </style>
 </head>
 <body>
@@ -17,9 +17,13 @@
         const size = 140;        
         const smallSize = 100;   
         const gachaCount = 10;   
-        const FRICTION = 0.92;      
-        const ROT_FRICTION = 0.88;  
-        const BOUNCE = 0.6;         
+        
+        // --- 動きの質感を「重め・硬め」に調整 ---
+        const FRICTION = 0.88;      // 摩擦を強めてヌルヌル動かないように
+        const ROT_FRICTION = 0.5;   // 回転はすぐ止める
+        const BOUNCE = 0.1;         // 跳ね返りはほぼゼロ（プラスチック感）
+        const GRAVITY = 0.6;        // 常に下へ溜まる重力
+        // ------------------------------------
 
         const boxes = [];
         const btn = document.getElementById('startBtn');
@@ -27,18 +31,12 @@
         function pickGachaImage() {
             const rand = Math.random() * 100;
             if (rand < 6) return 6;        
-            if (rand < 6 + 10) return 5;   
+            if (rand < 16) return 5;   
             return 4;                      
         }
 
-        // 1,2,3枚目
-        for (let i = 1; i <= 3; i++) {
-            createBox(i, i <= 2 ? size : smallSize);
-        }
-        // ガチャ枠
-        for (let i = 0; i < gachaCount; i++) {
-            createBox(pickGachaImage(), smallSize);
-        }
+        for (let i = 1; i <= 3; i++) createBox(i, i <= 2 ? size : smallSize);
+        for (let i = 0; i < gachaCount; i++) createBox(pickGachaImage(), smallSize);
 
         function createBox(imgNum, currentWidth) {
             const div = document.createElement('div');
@@ -51,25 +49,26 @@
 
             const data = {
                 el: div, 
-                // 横位置はバラバラ、縦位置は画面のずっと上（見えない位置）
                 px: Math.random() * (window.innerWidth - currentWidth), 
-                py: -500 - (Math.random() * 1000), // 時間差で降るようにバラけさせる
+                py: -500 - (Math.random() * 1000), 
                 vx: (Math.random() - 0.5) * 5, 
-                vy: 10 + Math.random() * 20, // 下方向への初速
-                angle: Math.random() * 360, va: (Math.random() - 0.5) * 10,
+                vy: 5 + Math.random() * 10, 
+                angle: Math.random() * 360, va: 0,
                 w: currentWidth, h: currentWidth,
-                mass: currentWidth > 150 ? 1.1 : 0.7,
+                mass: currentWidth > 150 ? 1.2 : 0.8,
                 isDragging: false
             };
 
             img.onload = () => { data.h = currentWidth * (img.naturalHeight / img.naturalWidth); };
             img.onerror = () => { img.style.display = 'none'; data.h = 0; };
             
-            div.addEventListener('touchstart', () => { data.isDragging = true; data.vx = 0; data.vy = 0; data.va = 0; });
+            div.addEventListener('touchstart', () => { data.isDragging = true; });
             window.addEventListener('touchmove', (e) => {
                 if (!data.isDragging) return;
                 let touch = Array.from(e.touches).find(t => t.target === div || div.contains(t.target));
                 if (touch) {
+                    data.vx = (touch.clientX - (currentWidth / 2) - data.px) * 0.2;
+                    data.vy = (touch.clientY - (data.h / 2) - data.py) * 0.2;
                     data.px = touch.clientX - (currentWidth / 2);
                     data.py = touch.clientY - (data.h / 2);
                 }
@@ -94,8 +93,8 @@
                 if(!ag || !ag.x) return;
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
-                        b.vx -= ag.x * b.mass * 0.8 * flip; 
-                        b.vy += ag.y * b.mass * 0.8 * flip;
+                        b.vx -= ag.x * 0.6 * flip; 
+                        b.vy += ag.y * 0.6 * flip;
                     }
                 });
             });
@@ -111,26 +110,30 @@
                         let minDist = (a.w + b.w) / 4 + (a.h + b.h) / 4; 
                         if (dist < minDist) {
                             let force = (minDist - dist) / dist;
-                            let mx = dx * force * 0.3;
-                            let my = dy * force * 0.3;
-                            if(!a.isDragging) { a.vx -= mx; a.vy -= my; a.va += mx * 0.05; }
-                            if(!b.isDragging) { b.vx += mx; b.vy += my; b.va -= mx * 0.05; }
+                            // 重なりを即座に解消（ジャラジャラ感）
+                            let mx = dx * force * 0.5;
+                            let my = dy * force * 0.5;
+                            if(!a.isDragging) { a.vx -= mx; a.vy -= my; a.va += mx * 0.01; }
+                            if(!b.isDragging) { b.vx += mx; b.vy += my; b.va -= mx * 0.01; }
                         }
                     }
                 }
                 boxes.forEach(b => {
                     if (b.h === 0) return;
                     if (!b.isDragging) {
+                        b.vy += GRAVITY; 
                         b.vx *= FRICTION; b.vy *= FRICTION; b.va *= ROT_FRICTION;
                         b.px += b.vx; b.py += b.vy; b.angle += b.va;
-                        // 横の壁
+
                         if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
                         if (b.px > window.innerWidth - b.w) { b.px = window.innerWidth - b.w; b.vx *= -BOUNCE; }
-                        // 天井（上からは降ってこれるように判定を py > 0 の時だけにする）
-                        if (b.py < -1000) { /* 降りてくる途中は何もしない */ }
+                        if (b.py < -1000) {} 
                         else if (b.py < 0 && b.vy < 0) { b.py = 0; b.vy *= -BOUNCE; }
-                        // 床
-                        if (b.py > window.innerHeight - b.h) { b.py = window.innerHeight - b.h; b.vy *= -BOUNCE; }
+                        if (b.py > window.innerHeight - b.h) { 
+                            b.py = window.innerHeight - b.h; 
+                            b.vy *= -BOUNCE; 
+                            b.vx *= 0.5; // 地面摩擦
+                        }
                     }
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
                 });
