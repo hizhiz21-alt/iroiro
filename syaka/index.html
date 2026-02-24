@@ -28,8 +28,8 @@
         const FRICTION = 0.93;      
         const ROT_FRICTION = 0.85; 
         const BOUNCE = 0.6;        
-        const GRAVITY = 0.05;        
-        const MAX_SPEED = 6;
+        const GRAVITY = 0.1;        
+        const MAX_SPEED = 4;
 
         let boxes = []; 
         const btn = document.getElementById('startBtn');
@@ -44,7 +44,9 @@
             return 4;                      
         }
 
+        // ガチャが手前に来るか奥に行くかを決める関数
         function getGachaZIndex() {
+            // 約1/3の確率で手前(110)、それ以外は奥(10)
             return Math.random() < 0.33 ? 110 : 10;
         }
 
@@ -64,7 +66,7 @@
                 w: currentWidth, h: 0,
                 isDragging: false,
                 isInitial: isInitial,
-                initialZ: zIndex 
+                initialZ: zIndex // 初期レイヤーを保持
             };
             img.onload = () => { data.h = currentWidth * (img.naturalHeight / img.naturalWidth); };
             
@@ -82,6 +84,7 @@
                 let lastX = data.px;
                 data.px = touch.clientX - (data.w / 2);
                 data.py = touch.clientY - (data.h / 2);
+                
                 data.vx = data.px - lastX; 
                 data.angle = data.vx * 1.5; 
             }, {passive: false});
@@ -89,23 +92,23 @@
             window.addEventListener('touchend', () => { 
                 if (!data.isDragging) return;
                 data.isDragging = false; 
-                div.style.zIndex = data.initialZ; 
+                div.style.zIndex = data.initialZ; // 元のレイヤーに戻す
             });
             boxes.push(data);
             return data;
         }
 
-        // ここが修正の肝です：静かに、すぐ上から出現するようにしました
         function dropBox(b) {
             b.px = Math.random() * (window.innerWidth - b.w);
-            b.py = -b.h - 10;    // 画面のすぐ上
-            b.vx = 0;            // 横の勢いを排除
-            b.vy = 0.5;          // ゆっくりと落下開始
-            b.va = 0;            // 回転させない
+            b.py = -200 - (Math.random() * 400); 
+            b.vx = (Math.random() - 0.5) * 15;
+            b.vy = 3 + Math.random() * 1;
+            b.va = (Math.random() - 0.5) * 20; 
             b.el.style.display = 'block';
         }
 
         for (let i = 1; i <= 3; i++) createBox(i, i <= 2 ? size : smallSize, 100 + i, true);
+        // スタート時のガチャ分に確率レイヤーを適用
         for (let i = 0; i < gachaCount; i++) createBox(pickGachaImage(), smallSize, getGachaZIndex(), true);
 
         btn.onclick = () => {
@@ -119,6 +122,7 @@
 
         addBtn.onclick = () => {
             for (let i = 0; i < 10; i++) {
+                // ここでも確率レイヤーを適用
                 const newBox = createBox(pickGachaImage(), smallSize, getGachaZIndex(), false);
                 dropBox(newBox);
             }
@@ -131,6 +135,7 @@
                 } else {
                     if (b.img.src.match(/[4-6]\.png$/)) {
                         b.img.src = `${pickGachaImage()}.png`;
+                        // リセット時にレイヤーも再計算して変化を出す
                         b.initialZ = getGachaZIndex();
                         b.el.style.zIndex = b.initialZ;
                     }
@@ -151,6 +156,8 @@
                     if (!b.isDragging) {
                         b.vx -= ag.x * 0.6 * flip; 
                         b.vy += ag.y * 0.6 * flip;
+                        const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+                        if (speed > 8) b.va += (b.vx * 0.04); 
                     }
                 });
             });
@@ -161,22 +168,33 @@
                         for (let j = i + 1; j < boxes.length; j++) {
                             let a = boxes[i], b = boxes[j];
                             if (a.h === 0 || b.h === 0) continue;
+                            
                             let dx = (b.px + b.w/2) - (a.px + a.w/2);
                             let dy = (b.py + b.h/2) - (a.py + a.h/2);
                             let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                            let minDist = (a.w + b.w) * 0.42;
+                    
+                            let minDist = (a.w + b.w) * 0.47;
+
                             if (dist < minDist) {
                                 let overlap = minDist - dist;
                                 let nx = dx / dist;
                                 let ny = dy / dist;
+                                
                                 let rvx = b.vx - a.vx
                                 let rvy = b.vy - a.vy;
                                 let velAlongNormal = rvx * nx + rvy * ny;
+
                                 if (velAlongNormal < 0) {
                                     let j_impulse = -(1 + BOUNCE) * velAlongNormal * 0.5;
                                     if (!a.isDragging) { a.vx -= nx * j_impulse; a.vy -= ny * j_impulse; }
                                     if (!b.isDragging) { b.vx += nx * j_impulse; b.vy += ny * j_impulse; }
+                                    
+                                    if (Math.abs(velAlongNormal) < 1.5) {
+                                        a.va *= 0.6;
+                                        b.va *= 0.6;
+                                    }
                                 }
+                            
                                 let moveX = nx * overlap * 0.5;
                                 let moveY = ny * overlap * 0.5;
                                 if (!a.isDragging) { a.px -= moveX; a.py -= moveY; }
@@ -188,22 +206,37 @@
 
                 boxes.forEach(b => {
                     if (!b.isDragging) {
-                        if (Math.abs(b.vx) < 0.1 && Math.abs(b.vy) < 0.1) {
+                        const moveSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+
+                        if (moveSpeed > 1) {
+                            b.va += b.vx * 0.1;
+                        }
+
+                        if (Math.abs(b.vx) < 0.8 && Math.abs(b.vy) < 0.8) {
                             b.vx = 0; b.vy = 0; b.va = 0; 
                         } else {
                             b.vy += GRAVITY;
                         }
+
                         b.vx *= FRICTION;
                         b.vy *= FRICTION;
                         b.va *= ROT_FRICTION;
+
+                        if (Math.abs(b.va) < 0.5) b.va = 0;
+
                         b.px += b.vx;
                         b.py += b.vy;
                         b.angle += b.va;
+
                         const rw = window.innerWidth - b.w;
                         const bh = window.innerHeight - b.h;
-                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
-                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; }
-                        if (b.py > bh) { b.py = bh; b.vy *= -BOUNCE; }
+
+                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; b.va *= 0.5; }
+                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; b.va *= 0.5; }
+                        if (b.py > bh) { 
+                            b.py = bh; b.vy *= -BOUNCE; b.va *= 0.4;
+                            if (Math.abs(b.vy) < 1) { b.vy = 0; b.va = 0; }
+                        }
                     }
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
                 });
