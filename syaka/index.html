@@ -152,7 +152,7 @@
             });
 
             function update() {
-                for (let step = 0; step < 2; step++) {
+                for (let step = 0; step < 4; step++) {
                     for (let i = 0; i < boxes.length; i++) {
                         for (let j = i + 1; j < boxes.length; j++) {
                             let a = boxes[i], b = boxes[j];
@@ -161,7 +161,7 @@
                             let dx = (b.px + b.w/2) - (a.px + a.w/2);
                             let dy = (b.py + b.h/2) - (a.py + a.h/2);
                             let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                            let minDist = (a.w + b.w) * 0.52;
+                            let minDist = (a.w + b.w) * 0.45;
 
                             if (dist < minDist) {
                                 let overlap = minDist - dist;
