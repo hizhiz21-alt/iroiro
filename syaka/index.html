@@ -65,18 +65,25 @@
             
             div.addEventListener('touchstart', (e) => { 
                 data.isDragging = true; 
+                data.angle = 0; // 掴んだ時に向きを直す
+                data.va = 0;
                 div.style.zIndex = 10000;
                 e.preventDefault(); 
             }, {passive: false});
+
             window.addEventListener('touchmove', (e) => {
                 if (!data.isDragging) return;
                 let touch = e.touches[0];
-                data.vx = (touch.clientX - (data.w / 2) - data.px) * 0.3;
-                data.vy = (touch.clientY - (data.h / 2) - data.py) * 0.3;
+                let lastX = data.px;
                 data.px = touch.clientX - (data.w / 2);
                 data.py = touch.clientY - (data.h / 2);
+                
+                data.vx = data.px - lastX; // 移動速度を更新
+                data.angle = data.vx * 1.5; // 振るとゆらゆらする
             }, {passive: false});
+
             window.addEventListener('touchend', () => { 
+                if (!data.isDragging) return;
                 data.isDragging = false; 
                 div.style.zIndex = isInitial ? 100 : 10;
             });
@@ -114,9 +121,13 @@
 
         resetBtn.onclick = () => {
             boxes.forEach(b => {
-                if (!b.isInitial) b.el.remove();
-                else {
-                    if (b.w === smallSize && b.isInitial) b.img.src = `${pickGachaImage()}.png`;
+                if (!b.isInitial) {
+                    b.el.remove();
+                } else {
+                    // 画像3が置き換わらないよう、ガチャ画像(4-6)のみ判定
+                    if (b.img.src.match(/[4-6]\.png$/)) {
+                        b.img.src = `${pickGachaImage()}.png`;
+                    }
                     dropBox(b);
                 }
             });
@@ -135,7 +146,6 @@
                         b.vx -= ag.x * 0.6 * flip; 
                         b.vy += ag.y * 0.6 * flip;
                         const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-                        // ★修正：振った時の回転の加算を控えめに
                         if (speed > 8) b.va += (b.vx * 0.04); 
                     }
                 });
@@ -167,7 +177,6 @@
                                     if (!a.isDragging) { a.vx -= nx * j_impulse; a.vy -= ny * j_impulse; }
                                     if (!b.isDragging) { b.vx += nx * j_impulse; b.vy += ny * j_impulse; }
                                     
-                                    // ★重要：ぶつかった時に回転エネルギーを逃がす
                                     if (Math.abs(velAlongNormal) < 1.5) {
                                         a.va *= 0.6;
                                         b.va *= 0.6;
@@ -184,7 +193,6 @@
 
                 boxes.forEach(b => {
                     if (!b.isDragging) {
-                        // ★重要：止まりそうな時は全てゼロにする
                         if (Math.abs(b.vx) < 0.4 && Math.abs(b.vy) < 0.4) {
                             b.vx = 0; b.vy = 0; b.va = 0; 
                         } else {
