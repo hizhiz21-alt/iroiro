@@ -31,7 +31,7 @@
         const GRAVITY = 0.6;        
 
         let boxes = []; 
-        let isShaking = false; // 振っているかどうかのフラグ
+        let currentAccel = 0; // 現在の振りの強さを記録
         const btn = document.getElementById('startBtn');
         const controls = document.getElementById('controls');
         const addBtn = document.getElementById('addBtn');
@@ -75,6 +75,7 @@
                 data.vy = (touch.clientY - (data.h / 2) - data.py) * 0.3;
                 data.px = touch.clientX - (data.w / 2);
                 data.py = touch.clientY - (data.h / 2);
+                data.va = data.vx * 0.5;
             }, {passive: false});
             window.addEventListener('touchend', () => { 
                 data.isDragging = false; 
@@ -133,16 +134,18 @@
                 
                 let ax = -ag.x * 0.6 * flip;
                 let ay = ag.y * 0.6 * flip;
-
-                // 強い入力があった時だけ「振っている」とみなす
-                isShaking = Math.abs(ax) > 1.5 || Math.abs(ay) > 1.5;
+                
+                // 揺れの強さを常に更新
+                currentAccel = Math.sqrt(ax * ax + ay * ay);
 
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
                         b.vx += ax; 
                         b.vy += ay;
-                        // 振っている時は回転エネルギーをしっかり与える
-                        if (isShaking) b.va += (ax * 0.15); 
+                        // 振っているとき(閾値1.5以上)だけ回転速度を加算する
+                        if (currentAccel > 1.5) {
+                            b.va += ax * 0.1;
+                        }
                     }
                 });
             });
@@ -162,6 +165,13 @@
                                 let overlap = minDist - dist;
                                 let nx = dx / dist;
                                 let ny = dy / dist;
+                                
+                                // 重なりによるエネルギー増幅を防ぐ(置いてあるときは回転を即座に殺す)
+                                if (currentAccel < 1.0) {
+                                    a.va *= 0.5;
+                                    b.va *= 0.5;
+                                }
+
                                 let rvx = b.vx - a.vx;
                                 let rvy = b.vy - a.vy;
                                 let velAlongNormal = rvx * nx + rvy * ny;
@@ -199,15 +209,16 @@
                         if (b.py >= bh) { 
                             b.py = bh; 
                             b.vy *= -BOUNCE; 
-                            // 地面付近での不快な微回転をカット（ただし振っている時は殺さない）
-                            if (!isShaking && Math.abs(b.vx) < 0.5) {
+                            // 静止判定を強化
+                            if (currentAccel < 1.0 && Math.abs(b.vx) < 0.5) {
                                 b.va = 0;
                                 b.vx = 0;
                             }
                         }
 
-                        // 【ここが重要】振っていない ＆ 速度が低い時は、のたうち回らないように完全に止める
-                        if (!isShaking && Math.abs(b.vx) < 0.2 && Math.abs(b.vy) < 0.2) {
+                        // 置いている時で、速度が低い時は「完全に固定」する
+                        // 動画のようなのたうち回るバグはここを通ることで根絶されます
+                        if (currentAccel < 1.0 && Math.abs(b.vx) < 0.2 && Math.abs(b.vy) < 0.2) {
                             b.vx = 0;
                             b.vy = 0;
                             b.va = 0;
