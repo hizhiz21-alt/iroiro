@@ -21,7 +21,7 @@
     </div>
 
     <script>
-        const size = 150;        
+        const size = 160;        
         const smallSize = 100;   
         const gachaCount = 10;   
         
@@ -154,8 +154,8 @@
                 if(!ag || ag.x === null) return;
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
-                        b.vx -= ag.x * 0.45 * flip; 
-                        b.vy += ag.y * 0.45 * flip;
+                        b.vx -= ag.x * 0.4 * flip; 
+                        b.vy += ag.y * 0.4 * flip;
                         const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
                         if (speed > 8) b.va += (b.vx * 0.04); 
                     }
