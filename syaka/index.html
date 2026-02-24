@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカ</title>
+    <title>シャカ</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25)); }
@@ -132,15 +132,9 @@
                 if(!ag || ag.x === null) return;
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
-                        const oldVx = b.vx;
-                        const oldVy = b.vy;
                         b.vx -= ag.x * 0.6 * flip; 
                         b.vy += ag.y * 0.6 * flip;
-                        
-                        // 加速度の差分のみを回転に加える（放置・静止で回らないように）
-                        const dvx = b.vx - oldVx;
-                        const dvy = b.vy - oldVy;
-                        b.va += (dvx + dvy) * 0.1;
+                        // ここでの va 加算を完全に廃止。回転は移動量から算出します。
                     }
                 });
             });
@@ -182,39 +176,44 @@
 
                 boxes.forEach(b => {
                     if (!b.isDragging) {
+                        const prevPx = b.px; // 移動前の位置を記録
+
                         b.vy += GRAVITY;
                         b.vx *= FRICTION;
                         b.vy *= FRICTION;
-                        b.va *= ROT_FRICTION;
 
-                        // 【重要】速度が一定以下の時は回転を完全に殺す
-                        if (Math.abs(b.vx) < 0.3 && Math.abs(b.vy) < 0.3) {
-                            b.vx = 0;
-                            b.vy = 0;
-                            b.va = 0; 
-                        }
-                        if (Math.abs(b.va) < 0.1) b.va = 0;
-
+                        // 速度制限と微細振動カット
+                        if (Math.abs(b.vx) < 0.2) b.vx = 0;
+                        if (Math.abs(b.vy) < 0.2) b.vy = 0;
                         b.vx = Math.min(Math.max(b.vx, -MAX_SPEED), MAX_SPEED);
                         b.vy = Math.min(Math.max(b.vy, -MAX_SPEED), MAX_SPEED);
 
                         b.px += b.vx;
                         b.py += b.vy;
-                        b.angle += b.va;
 
                         const rw = window.innerWidth - b.w;
                         const bh = window.innerHeight - b.h;
 
+                        // 境界判定
                         if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; }
                         if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; }
                         if (b.py > bh) { 
                             b.py = bh; b.vy *= -BOUNCE; 
-                            if (Math.abs(b.vy) < 0.8) {
-                                b.vy = 0;
-                                b.va = 0; // 床に接したら回転停止
-                            }
+                            if (Math.abs(b.vy) < 0.8) b.vy = 0;
                         }
                         if (b.py < -1000) b.py = -1000;
+
+                        // ★最重要：回転の計算
+                        // 「実際に横に動いた距離」がある時だけ、それに応じて回転させる
+                        const actualMoveX = b.px - prevPx;
+                        if (Math.abs(actualMoveX) > 0.1) {
+                            b.va = (actualMoveX / b.w) * 50; // 移動量に比例した回転
+                        } else {
+                            b.va *= ROT_FRICTION; // 移動していない時は減衰
+                        }
+                        
+                        if (Math.abs(b.va) < 0.1) b.va = 0;
+                        b.angle += b.va;
                     }
                     b.el.style.transform = `translate(${b.px}px, ${b.py}px) rotate(${b.angle}deg)`;
                 });
