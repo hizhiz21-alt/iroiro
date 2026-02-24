@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカ・ラメ</title>
+    <title>シャカシャカするやつ</title>
     <style>
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #1a1a1a; touch-action: none; }
-        /* ラメ用のキャンバスを背面に配置 */
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         #glitterCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
-        .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); z-index: 10; }
+        .box { position: absolute; will-change: transform; left: 0; top: 0; cursor: grab; display: none; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25)); z-index: 10; }
         .box img { width: 100%; height: auto; display: block; pointer-events: none; user-select: none; }
-        button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 10000; border-radius: 50px; border: none; background: #fff; color: #333; cursor: pointer; font-weight: bold; }
+        button { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 20px; z-index: 10000; border-radius: 50px; border: none; background: #333; color: white; cursor: pointer; }
         .controls { position: absolute; top: 10px; right: 10px; z-index: 20000; display: none; gap: 8px; }
-        .ctrl-btn { position: static; transform: none; padding: 10px 15px; font-size: 14px; background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 5px; cursor: pointer; backdrop-filter: blur(4px); }
+        .ctrl-btn { position: static; transform: none; padding: 10px 15px; font-size: 14px; background: rgba(51, 51, 51, 0.8); color: white; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -27,15 +26,14 @@
         const size = 150;        
         const smallSize = 100;   
         const gachaCount = 10;   
-        
-        // ふんわり設定
-        const FRICTION = 0.96;      
-        const ROT_FRICTION = 0.95; 
+    
+        const FRICTION = 0.93;      
+        const ROT_FRICTION = 0.85; 
         const BOUNCE = 0.6;        
-        const GRAVITY = 0.08; 
+        const GRAVITY = 0.1;        
 
         let boxes = []; 
-        let glitters = []; // ラメ用配列
+        let glitters = [];
         const canvas = document.getElementById('glitterCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -51,16 +49,15 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // ラメの作成
         function createGlitter() {
-            for(let i=0; i<150; i++) {
+            glitters = []; // リセット
+            for(let i=0; i<80; i++) { // 酔い防止に少し数を絞りました
                 glitters.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    vx: (Math.random() - 0.5) * 2,
-                    vy: (Math.random() - 0.5) * 2,
+                    vx: 0, vy: 0,
                     size: Math.random() * 2 + 1,
-                    color: `hsla(${Math.random() * 60 + 180}, 80%, 80%, ${Math.random() * 0.8 + 0.2})`, // 青〜白系のキラキラ
+                    color: `hsla(${Math.random() * 40 + 40}, 100%, 60%, ${Math.random() * 0.5 + 0.3})`, // ゴールド系のラメ
                     phase: Math.random() * Math.PI * 2
                 });
             }
@@ -127,8 +124,8 @@
         function dropBox(b) {
             b.px = Math.random() * (window.innerWidth - b.w);
             b.py = -200 - (Math.random() * 400); 
-            b.vx = (Math.random() - 0.5) * 10;
-            b.vy = 2 + Math.random() * 3;
+            b.vx = (Math.random() - 0.5) * 15;
+            b.vy = 5 + Math.random() * 5;
             b.el.style.display = 'block';
         }
 
@@ -171,8 +168,8 @@
             window.addEventListener("devicemotion", (e) => {
                 let ag = e.accelerationIncludingGravity;
                 if(!ag || ag.x === null) return;
-                accelX = ag.x * 0.2 * flip;
-                accelY = ag.y * 0.2 * flip;
+                accelX = ag.x * 0.6 * flip;
+                accelY = ag.y * 0.6 * flip;
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
                         b.vx -= accelX; b.vy += accelY;
@@ -181,18 +178,21 @@
             });
 
             function update() {
-                // ラメの描画
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 glitters.forEach(g => {
-                    g.vx += (accelX * -0.1); // 傾きでラメも流れる
-                    g.vy += (accelY * 0.1) + GRAVITY * 0.5;
-                    g.vx *= 0.98; g.vy *= 0.98;
+                    // ラメもパーツと同じ重力と摩擦で計算！
+                    g.vx -= accelX * 0.1;
+                    g.vy += accelY * 0.1 + GRAVITY; 
+                    g.vx *= FRICTION;
+                    g.vy *= FRICTION;
                     g.x += g.vx; g.y += g.vy;
-                    g.phase += 0.05;
+                    g.phase += 0.08;
 
-                    if(g.x < 0) g.x = canvas.width;
-                    if(g.x > canvas.width) g.x = 0;
-                    if(g.y > canvas.height) g.y = 0;
+                    // 壁判定
+                    if(g.x < 0) { g.x = 0; g.vx *= -BOUNCE; }
+                    if(g.x > canvas.width) { g.x = canvas.width; g.vx *= -BOUNCE; }
+                    if(g.y > canvas.height) { g.y = canvas.height; g.vy *= -BOUNCE; }
+                    if(g.y < 0) { g.y = 0; g.vy *= -BOUNCE; }
 
                     const opacity = (Math.sin(g.phase) + 1) / 2;
                     ctx.fillStyle = g.color;
@@ -203,7 +203,6 @@
                 });
                 ctx.globalAlpha = 1.0;
 
-                // 物理演算
                 for (let step = 0; step < 4; step++) {
                     for (let i = 0; i < boxes.length; i++) {
                         for (let j = i + 1; j < boxes.length; j++) {
@@ -233,7 +232,7 @@
 
                 boxes.forEach(b => {
                     if (!b.isDragging) {
-                        if (Math.abs(b.vx) < 0.2 && Math.abs(b.vy) < 0.2) { b.vx = 0; b.vy = 0; b.va = 0; } 
+                        if (Math.abs(b.vx) < 0.8 && Math.abs(b.vy) < 0.8) { b.vx = 0; b.vy = 0; b.va = 0; } 
                         else { b.vy += GRAVITY; }
                         b.vx *= FRICTION; b.vy *= FRICTION; b.va *= ROT_FRICTION;
                         b.px += b.vx; b.py += b.vy; b.angle += b.va;
