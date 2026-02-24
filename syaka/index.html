@@ -44,6 +44,12 @@
             return 4;                      
         }
 
+        // ガチャが手前に来るか奥に行くかを決める関数
+        function getGachaZIndex() {
+            // 約1/3の確率で手前(110)、それ以外は奥(10)
+            return Math.random() < 0.33 ? 110 : 10;
+        }
+
         function createBox(imgNum, currentWidth, zIndex, isInitial = false) {
             const div = document.createElement('div');
             div.className = 'box';
@@ -59,7 +65,8 @@
                 angle: Math.random() * 360, va: 0,
                 w: currentWidth, h: 0,
                 isDragging: false,
-                isInitial: isInitial 
+                isInitial: isInitial,
+                initialZ: zIndex // 初期レイヤーを保持
             };
             img.onload = () => { data.h = currentWidth * (img.naturalHeight / img.naturalWidth); };
             
@@ -85,7 +92,7 @@
             window.addEventListener('touchend', () => { 
                 if (!data.isDragging) return;
                 data.isDragging = false; 
-                div.style.zIndex = isInitial ? 100 : 10;
+                div.style.zIndex = data.initialZ; // 元のレイヤーに戻す
             });
             boxes.push(data);
             return data;
@@ -101,7 +108,8 @@
         }
 
         for (let i = 1; i <= 3; i++) createBox(i, i <= 2 ? size : smallSize, 100 + i, true);
-        for (let i = 0; i < gachaCount; i++) createBox(pickGachaImage(), smallSize, 10, true);
+        // スタート時のガチャ分に確率レイヤーを適用
+        for (let i = 0; i < gachaCount; i++) createBox(pickGachaImage(), smallSize, getGachaZIndex(), true);
 
         btn.onclick = () => {
             boxes.forEach(b => dropBox(b));
@@ -114,7 +122,8 @@
 
         addBtn.onclick = () => {
             for (let i = 0; i < 10; i++) {
-                const newBox = createBox(pickGachaImage(), smallSize, 10, false);
+                // ここでも確率レイヤーを適用
+                const newBox = createBox(pickGachaImage(), smallSize, getGachaZIndex(), false);
                 dropBox(newBox);
             }
         };
@@ -126,6 +135,9 @@
                 } else {
                     if (b.img.src.match(/[4-6]\.png$/)) {
                         b.img.src = `${pickGachaImage()}.png`;
+                        // リセット時にレイヤーも再計算して変化を出す
+                        b.initialZ = getGachaZIndex();
+                        b.el.style.zIndex = b.initialZ;
                     }
                     dropBox(b);
                 }
@@ -144,7 +156,6 @@
                     if (!b.isDragging) {
                         b.vx -= ag.x * 0.6 * flip; 
                         b.vy += ag.y * 0.6 * flip;
-                        // ここでの速度計上と回転加算は維持
                         const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
                         if (speed > 8) b.va += (b.vx * 0.04); 
                     }
@@ -197,7 +208,6 @@
                     if (!b.isDragging) {
                         const moveSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
 
-                        // ★追加：横方向の動きを回転に変換（ moveSpeed判定を入れることで静止時の暴走を防ぐ）
                         if (moveSpeed > 1) {
                             b.va += b.vx * 0.1;
                         }
