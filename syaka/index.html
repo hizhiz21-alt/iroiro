@@ -25,12 +25,11 @@
         const smallSize = 100;   
         const gachaCount = 10;   
         
-        const FRICTION = 0.92;      // 摩擦を強めて早く止める
-        const ROT_FRICTION = 0.80;  // 回転はさらに強力に抑制
-        const BOUNCE = 0.2;        
+        const FRICTION = 0.90;      // 摩擦を強めに設定
+        const ROT_FRICTION = 0.70;  // 回転の減衰を大幅に強化
+        const BOUNCE = 0.15;        // 跳ね返りを抑えて安定させる
         const GRAVITY = 0.8;        
-        const MAX_SPEED = 20;
-
+        
         let boxes = []; 
         const btn = document.getElementById('startBtn');
         const controls = document.getElementById('controls');
@@ -131,8 +130,8 @@
                 let ag = e.accelerationIncludingGravity;
                 if(!ag || ag.x === null) return;
                 
-                // 【不快感防止】微弱な傾きノイズを完全にカット
-                const threshold = 1.2;
+                // 加速度のノイズをカット
+                const threshold = 1.5;
                 let ax = -ag.x * 0.6 * flip;
                 let ay = ag.y * 0.6 * flip;
                 if(Math.abs(ax) < threshold) ax = 0;
@@ -142,7 +141,8 @@
                     if (!b.isDragging) {
                         b.vx += ax; 
                         b.vy += ay;
-                        if (Math.abs(ax) > threshold) b.va += (ax * 0.1); 
+                        // 振った時だけ回転エネルギーを与える
+                        if (Math.abs(ax) > threshold) b.va += (ax * 0.05); 
                     }
                 });
             });
@@ -157,12 +157,17 @@
                             let dx = (b.px + b.w/2) - (a.px + a.w/2);
                             let dy = (b.py + b.h/2) - (a.py + a.h/2);
                             let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                            let minDist = (a.w + b.w) * 0.48;
+                            let minDist = (a.w + b.w) * 0.47; 
 
                             if (dist < minDist) {
                                 let overlap = minDist - dist;
                                 let nx = dx / dist;
                                 let ny = dy / dist;
+                                
+                                // 衝突時に回転を殺す
+                                a.va *= 0.8;
+                                b.va *= 0.8;
+
                                 let rvx = b.vx - a.vx;
                                 let rvy = b.vy - a.vy;
                                 let velAlongNormal = rvx * nx + rvy * ny;
@@ -195,24 +200,21 @@
                         const rw = window.innerWidth - b.w;
                         const bh = window.innerHeight - b.h;
 
-                        // 壁判定：ぶつかった時も回転を大幅に減衰
-                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; b.va *= 0.5; }
-                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; b.va *= 0.5; }
-                        
-                        // 【超重要】床に接地した際の個別停止処理
+                        // 壁・床の境界判定と回転リセット
+                        if (b.px < 0) { b.px = 0; b.vx *= -BOUNCE; b.va = 0; }
+                        if (b.px > rw) { b.px = rw; b.vx *= -BOUNCE; b.va = 0; }
                         if (b.py >= bh) { 
                             b.py = bh; 
                             b.vy *= -BOUNCE;
-                            // わずかな動きでも床付近なら即座に物理演算をロック（回転も移動も0にする）
-                            if (Math.abs(b.vx) < 0.8 && Math.abs(b.vy) < 0.8) {
-                                b.vx = 0;
-                                b.vy = 0;
-                                b.va = 0;
-                            }
+                            // 接地時の微細な動きをカット
+                            if (Math.abs(b.vy) < 1.0) { b.vy = 0; b.va = 0; }
                         }
 
-                        // 空中でも、速度が死んでいるなら回転を完全に殺す
-                        if (Math.abs(b.vx) < 0.1 && Math.abs(b.vy) < 0.1) {
+                        // 【最重要】動画の「のたうち回り」を止めるための強制ロック判定
+                        // 速度が一定以下なら、その瞬間にすべての運動（回転含む）を0にする
+                        if (Math.abs(b.vx) < 1.2 && Math.abs(b.vy) < 1.2) {
+                            b.vx = 0;
+                            b.vy = 0;
                             b.va = 0;
                         }
                     }
