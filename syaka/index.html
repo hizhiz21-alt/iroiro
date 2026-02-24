@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シャカシャカ・ラメ完全版</title>
+    <title>シャカシャカ・青ラメ版</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; background: #f0f0f0; touch-action: none; }
         #glitterCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
@@ -23,53 +23,44 @@
     </div>
 
     <script>
-        const size = 150;        
-        const smallSize = 100;   
-        const gachaCount = 10;   
-        const FRICTION = 0.93;      
-        const ROT_FRICTION = 0.85; 
-        const BOUNCE = 0.6;        
-        const GRAVITY = 0.1;        
+        const size = 150; const smallSize = 100; const gachaCount = 10;   
+        const FRICTION = 0.93; const ROT_FRICTION = 0.85; const BOUNCE = 0.6; const GRAVITY = 0.15;        
 
-        let boxes = []; 
-        let glitters = [];
+        let boxes = []; let glitters = [];
         const canvas = document.getElementById('glitterCanvas');
         const ctx = canvas.getContext('2d');
         const btn = document.getElementById('startBtn');
         const controls = document.getElementById('controls');
-        const addBtn = document.getElementById('addBtn');
-        const resetBtn = document.getElementById('resetBtn');
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize); resize();
 
         function createGlitter() {
             glitters = [];
-            for(let i=0; i<80; i++) {
+            const blueColors = [
+                'hsla(200, 100%, 70%, 0.8)', // スカイブルー
+                'hsla(220, 100%, 60%, 0.8)', // ロイヤルブルー
+                'hsla(190, 100%, 90%, 0.7)', // 白水色
+                'hsla(210, 80%, 50%, 0.6)'   // 深い青
+            ];
+            for(let i=0; i<100; i++) {
                 glitters.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
                     vx: 0, vy: 0,
                     size: Math.random() * 2 + 1,
-                    color: `hsla(${Math.random() * 40 + 40}, 100%, 60%, ${Math.random() * 0.5 + 0.3})`,
-                    phase: Math.random() * Math.PI * 2
+                    color: blueColors[Math.floor(Math.random() * blueColors.length)],
+                    friction: 0.88 + Math.random() * 0.08, // 少しバラけさせる
+                    gravityMult: 0.4 + Math.random() * 1.3,
+                    phase: Math.random() * Math.PI * 2,
+                    drift: Math.random() * 0.3
                 });
             }
         }
 
         function pickGachaImage() {
             const rand = Math.random() * 100;
-            if (rand < 6) return 6;        
-            if (rand < 16) return 5;   
-            return 4;                      
-        }
-
-        function getGachaZIndex() {
-            return Math.random() < 0.33 ? 110 : 10;
+            if (rand < 6) return 6; if (rand < 16) return 5; return 4;                      
         }
 
         function createBox(imgNum, currentWidth, zIndex, isInitial = false) {
@@ -77,85 +68,53 @@
             div.className = 'box';
             div.style.width = currentWidth + 'px';
             div.style.zIndex = zIndex; 
-            const img = new Image();
-            img.src = `${imgNum}.png`;
-            div.appendChild(img);
-            document.body.appendChild(div);
+            const img = new Image(); img.src = `${imgNum}.png`;
+            div.appendChild(img); document.body.appendChild(div);
 
             const data = {
                 el: div, img: img, px: 0, py: 0, vx: 0, vy: 0, 
-                angle: Math.random() * 360, va: 0,
-                w: currentWidth, h: 0,
-                isDragging: false,
-                isInitial: isInitial,
-                initialZ: zIndex
+                angle: Math.random() * 360, va: 0, w: currentWidth, h: 0,
+                isDragging: false, isInitial: isInitial, initialZ: zIndex
             };
             img.onload = () => { data.h = currentWidth * (img.naturalHeight / img.naturalWidth); };
             
             div.addEventListener('touchstart', (e) => { 
-                data.isDragging = true; 
-                div.style.zIndex = 10000;
-                e.preventDefault(); 
+                data.isDragging = true; div.style.zIndex = 10000; e.preventDefault(); 
             }, {passive: false});
 
             window.addEventListener('touchmove', (e) => {
                 if (!data.isDragging) return;
                 let touch = e.touches[0];
-                let lastX = data.px;
-                let lastY = data.py;
+                let lastX = data.px; let lastY = data.py;
                 data.px = touch.clientX - (data.w / 2);
                 data.py = touch.clientY - (data.h / 2);
-                data.vx = data.px - lastX; 
-                data.vy = data.py - lastY;
+                data.vx = data.px - lastX; data.vy = data.py - lastY;
                 data.angle = data.vx * 1.5; 
             }, {passive: false});
 
             window.addEventListener('touchend', () => { 
                 if (!data.isDragging) return;
-                data.isDragging = false; 
-                div.style.zIndex = data.initialZ;
+                data.isDragging = false; div.style.zIndex = data.initialZ;
             });
-            boxes.push(data);
-            return data;
+            boxes.push(data); return data;
         }
 
         function dropBox(b) {
             b.px = Math.random() * (window.innerWidth - b.w);
             b.py = -200 - (Math.random() * 400); 
-            b.vx = (Math.random() - 0.5) * 15;
-            b.vy = 5 + Math.random() * 5;
+            b.vx = (Math.random() - 0.5) * 15; b.vy = 5 + Math.random() * 5;
             b.el.style.display = 'block';
         }
 
         for (let i = 1; i <= 3; i++) createBox(i, i <= 2 ? size : smallSize, 100 + i, true);
-        for (let i = 0; i < gachaCount; i++) createBox(pickGachaImage(), smallSize, getGachaZIndex(), true);
+        for (let i = 0; i < gachaCount; i++) createBox(pickGachaImage(), smallSize, Math.random() < 0.33 ? 110 : 10, true);
 
         btn.onclick = () => {
-            createGlitter();
-            boxes.forEach(b => dropBox(b));
+            createGlitter(); boxes.forEach(b => dropBox(b));
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission().then(run).catch(() => run());
             } else { run(); }
-            btn.style.display = 'none';
-            controls.style.display = 'flex';
-        };
-
-        addBtn.onclick = () => {
-            for (let i = 0; i < 10; i++) {
-                const newBox = createBox(pickGachaImage(), smallSize, getGachaZIndex(), false);
-                dropBox(newBox);
-            }
-        };
-
-        resetBtn.onclick = () => {
-            boxes.forEach(b => {
-                if (!b.isInitial) b.el.remove();
-                else {
-                    if (b.img.src.match(/[4-6]\.png$/)) b.img.src = `${pickGachaImage()}.png`;
-                    dropBox(b);
-                }
-            });
-            boxes = boxes.filter(b => b.isInitial);
+            btn.style.display = 'none'; controls.style.display = 'flex';
         };
 
         function run() {
@@ -166,21 +125,23 @@
             window.addEventListener("devicemotion", (e) => {
                 let ag = e.accelerationIncludingGravity;
                 if(!ag || ag.x === null) return;
-                accelX = ag.x * 0.6 * flip;
-                accelY = ag.y * 0.6 * flip;
+                accelX = ag.x * 0.6 * flip; accelY = ag.y * 0.6 * flip;
                 boxes.forEach(b => { if (!b.isDragging) { b.vx -= accelX; b.vy += accelY; } });
             });
 
             function update() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 glitters.forEach(g => {
-                    g.vx -= accelX * 0.1; g.vy += accelY * 0.1 + GRAVITY;
-                    g.vx *= FRICTION; g.vy *= FRICTION;
-                    g.x += g.vx; g.y += g.vy; g.phase += 0.08;
-                    if(g.x < 0) { g.x = 0; g.vx *= -BOUNCE; }
-                    if(g.x > canvas.width) { g.x = canvas.width; g.vx *= -BOUNCE; }
-                    if(g.y > canvas.height) { g.y = canvas.height; g.vy *= -BOUNCE; }
+                    g.vx -= accelX * 0.1 + (Math.sin(g.phase) * g.drift);
+                    g.vy += accelY * 0.1 + (GRAVITY * g.gravityMult);
+                    g.vx *= g.friction; g.vy *= g.friction;
+                    g.x += g.vx; g.y += g.vy; g.phase += 0.05;
+
+                    if(g.x < 0) { g.x = 0; g.vx *= -BOUNCE * Math.random(); }
+                    if(g.x > canvas.width) { g.x = canvas.width; g.vx *= -BOUNCE * Math.random(); }
+                    if(g.y > canvas.height) { g.y = canvas.height; g.vy *= -BOUNCE * 0.2; g.vx += (Math.random()-0.5); }
                     if(g.y < 0) { g.y = 0; g.vy *= -BOUNCE; }
+
                     ctx.fillStyle = g.color; ctx.globalAlpha = (Math.sin(g.phase) + 1) / 2;
                     ctx.beginPath(); ctx.arc(g.x, g.y, g.size, 0, Math.PI*2); ctx.fill();
                 });
@@ -230,6 +191,8 @@
             }
             update();
         }
+        document.getElementById('addBtn').onclick = () => { for (let i = 0; i < 10; i++) dropBox(createBox(pickGachaImage(), smallSize, Math.random() < 0.33 ? 110 : 10)); };
+        document.getElementById('resetBtn').onclick = () => { location.reload(); };
     </script>
 </body>
 </html>
