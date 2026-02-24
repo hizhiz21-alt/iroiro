@@ -25,7 +25,7 @@
         const smallSize = 100;   
         const gachaCount = 10;   
         
-        const FRICTION = 0.95;      
+        const FRICTION = 0.93;      
         const ROT_FRICTION = 0.85; 
         const BOUNCE = 0.6;        
         const GRAVITY = 0.2;        
@@ -154,8 +154,8 @@
                 if(!ag || ag.x === null) return;
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
-                        b.vx -= ag.x * 0.4 * flip; 
-                        b.vy += ag.y * 0.4 * flip;
+                        b.vx -= ag.x * 0.25 * flip; 
+                        b.vy += ag.y * 0.25 * flip;
                         const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
                         if (speed > 8) b.va += (b.vx * 0.04); 
                     }
