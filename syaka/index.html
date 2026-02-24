@@ -154,8 +154,8 @@
                 if(!ag || ag.x === null) return;
                 boxes.forEach(b => { 
                     if (!b.isDragging) {
-                        b.vx -= ag.x * 0.25 * flip; 
-                        b.vy += ag.y * 0.25 * flip;
+                        b.vx -= ag.x * 0.35 * flip; 
+                        b.vy += ag.y * 0.35 * flip;
                         const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
                         if (speed > 8) b.va += (b.vx * 0.04); 
                     }
