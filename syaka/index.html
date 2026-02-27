@@ -212,10 +212,12 @@
                             b.va += b.vx * 0.1;
                         }
 
-                        if (Math.abs(b.vx) < 0.8 && Math.abs(b.vy) < 0.8) {
-                            b.vx = 0; b.vy = 0; b.va = 0; 
-                        } else {
-                            b.vy += GRAVITY;
+                        // 速度が 0.1 未満なら停止。重力を外に出して、常にゆっくり落ちるように変更
+if (Math.abs(b.vx) < 0.4 && Math.abs(b.vy) < 0.4) {
+b.vx = 0; b.vy = 0; b.va = 0;
+}
+b.vy += GRAVITY; 
+
                         }
 
                         b.vx *= FRICTION;
