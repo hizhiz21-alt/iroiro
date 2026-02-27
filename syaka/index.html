@@ -25,7 +25,7 @@
         const smallSize = 100;   
         const gachaCount = 10;   
         
-        const FRICTION = 0.93;      
+        const FRICTION = 0.9;      
         const ROT_FRICTION = 0.85; 
         const BOUNCE = 0.6;        
         const GRAVITY = 0.2;        
@@ -192,7 +192,7 @@
                         const moveSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
                         if (moveSpeed > 1) { b.va += b.vx * 0.1; }
 
-                        if (Math.abs(b.vx) < 0.1 && Math.abs(b.vy) < 0.1) {
+                        if (Math.abs(b.vx) < 0.4 && Math.abs(b.vy) < 0.4) {
                             b.vx = 0; b.vy = 0; b.va = 0;
                         }
                         b.vy += GRAVITY;
